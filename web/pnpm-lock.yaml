@@ -61,6 +61,9 @@ importers:
       nanoid:
         specifier: ^5.0.7
         version: 5.0.7
+      path-browserify:
+        specifier: ^1.0.1
+        version: 1.0.1
       pinia:
         specifier: ^2.2.2
         version: 2.2.2(typescript@5.6.2)(vue@3.5.6(typescript@5.6.2))
@@ -104,6 +107,9 @@ importers:
       '@types/node':
         specifier: ^20.16.5
         version: 20.16.5
+      '@types/path-browserify':
+        specifier: ^1.0.3
+        version: 1.0.3
       '@types/xml2js':
         specifier: ^0.4.14
         version: 0.4.14
@@ -673,6 +679,12 @@ packages:
     resolution:
       {
         integrity: sha512-VwYCweNo3ERajwy0IUlqqcyZ8/A7Zwa9ZP3MnENWcB11AejO+tLy3pu850goUW2FC/IJMdZUfKpX/yxL1gymCA==,
+      }
+
+  '@types/path-browserify@1.0.3':
+    resolution:
+      {
+        integrity: sha512-ZmHivEbNCBtAfcrFeBCiTjdIc2dey0l7oCGNGpSuRTy8jP6UVND7oUowlvDujBy8r2Hoa8bfFUOCiPWfmtkfxw==,
       }
 
   '@types/sortablejs@1.15.8':
@@ -2869,6 +2881,8 @@ snapshots:
   '@types/node@20.16.5':
     dependencies:
       undici-types: 6.19.8
+
+  '@types/path-browserify@1.0.3': {}
 
   '@types/sortablejs@1.15.8': {}
 
