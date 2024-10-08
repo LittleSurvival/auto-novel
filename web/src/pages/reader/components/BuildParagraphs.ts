@@ -19,7 +19,6 @@ export const buildParagraphs = (
   gnid: GenericNovelId,
   chapter: ReaderChapter,
 ): ReaderParagraph[] => {
-  const cc = Locator.settingRepository().cc.value;
   const setting = Locator.readerSettingRepository().setting.value;
 
   const merged: ReaderParagraph[] = [];
@@ -70,7 +69,7 @@ export const buildParagraphs = (
         if (paragraphs) {
           hasAnyTranslation = true;
           styles.push({
-            paragraphs: paragraphs.map((it) => cc.toView(it)),
+            paragraphs,
             source: t,
             secondary: false,
             needSpeak: needSpeakZh,
@@ -97,7 +96,7 @@ export const buildParagraphs = (
         const [label, paragraphs] = paragraphsWithLabel(t);
         if (paragraphs) {
           styles.push({
-            paragraphs: paragraphs.map((it) => cc.toView(it)),
+            paragraphs,
             source: t,
             secondary: false,
             needSpeak: needSpeakZh && i === 0,

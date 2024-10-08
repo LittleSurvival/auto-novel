@@ -27,9 +27,6 @@ export interface Setting {
     value: 'byCreateAt' | 'byReadAt' | 'byId';
     desc: boolean;
   };
-  //
-  locale: 'zh-cn' | 'zh-tw';
-  searchLocaleAware: boolean;
 }
 
 export namespace Setting {
@@ -60,9 +57,6 @@ export namespace Setting {
       value: 'byCreateAt',
       desc: true,
     },
-    //
-    locale: 'zh-cn',
-    searchLocaleAware: false,
   };
 
   export const migrate = (setting: Setting) => {
@@ -119,10 +113,6 @@ export namespace Setting {
     { value: 'byCreateAt', label: '添加时间' },
     { value: 'byReadAt', label: '阅读时间' },
     { value: 'byId', label: '标题' },
-  ];
-  export const localeOptions = [
-    { label: '简体中文', value: 'zh-cn' },
-    { label: '繁体中文', value: 'zh-tw' },
   ];
 }
 

@@ -48,11 +48,9 @@ export default defineConfig(({ command, mode }) => {
             if (id.includes('web/src')) {
               return 'chunk';
             } else if (id.includes('@zip.js')) {
-              return 'dep-zip';
-            } else if (id.includes('opencc')) {
-              return 'dep-opencc';
+              return 'zip';
             } else if (id.includes('naive')) {
-              return 'dep-naive';
+              return 'naive';
             } else if (id.includes('node_module')) {
               return 'dep';
             }

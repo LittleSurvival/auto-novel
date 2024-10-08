@@ -8,6 +8,8 @@ import { Glossary } from '@/model/Glossary';
 import { useIsWideScreen } from '@/pages/util';
 import { getFullContent } from '@/util/file';
 import LoadedVolume from './components/LoadedVolume.vue';
+import { KataKanaInfo } from '@/model/KataKana';
+import { ref } from 'vue';
 
 const message = useMessage();
 const isWideScreen = useIsWideScreen();
@@ -26,21 +28,37 @@ interface LoadedVolume {
   source: 'tmp' | 'local';
   filename: string;
   content: string;
-  katakanas: Map<string, number>;
+  katakanas: Map<string, KataKanaInfo>;
 }
 
-const loadedVolumes = ref<LoadedVolume[]>([]);
-
-const countKatakana = (content: string) => {
+const countKatakana = (content: string): Map<string, KataKanaInfo> => {
   const regexp = /[\u30A0-\u30FF]{2,}/g;
   const matches = content.matchAll(regexp);
-  const katakanaCounter = new Map<string, number>();
+  const katakanaCounter = new Map<string, KataKanaInfo>();
   for (const match of matches) {
     const w = match[0];
-    katakanaCounter.set(w, (katakanaCounter.get(w) || 0) + 1);
+    const existingInfo = katakanaCounter.get(w);
+    if (existingInfo) {
+      existingInfo.count += 1;
+    } else {
+      katakanaCounter.set(w, {
+        wordTranslations: {
+          translations: [],
+          translationNotes: '',
+        },
+        count: 1,
+        intelligentSummary: '',
+        gender: '',
+        summary: '',
+        originalContextText: '',
+        translatedContextText: '',
+      });
+    }
   }
   const sortedKatakanaCounter = new Map(
-    [...katakanaCounter].sort(([_w1, c1], [_w2, c2]) => c2 - c1),
+    Array.from(katakanaCounter.entries()).sort(
+      (a, b) => b[1].count - a[1].count,
+    ),
   );
   return sortedKatakanaCounter;
 };
@@ -102,10 +120,10 @@ const customRequest = ({
 const katakanaThredhold = ref(10);
 
 const katakanaMerged = computed(() => {
-  const map: KataKana = {};
+  const map = new Map<string, number>();
   loadedVolumes.value.forEach(({ katakanas }) => {
     katakanas.forEach((value, key) => {
-      map.set(key, (map.get(key) ?? 0) + value);
+      map.set(key, (map.get(key) ?? 0) + value.count);
     });
   });
   return map;
@@ -123,9 +141,9 @@ const lastDeletedHint = computed(() => {
 
 const katakanas = computed(() => {
   return new Map(
-    Object.entries(katakanaMerged.value).filter(
+    [...katakanaMerged.value].filter(
       ([w, c]) =>
-        c.count > katakanaThredhold.value && !katakanaDeleted.value.includes(w),
+        c > katakanaThredhold.value && !katakanaDeleted.value.includes(w),
     ),
   );
 });
@@ -146,7 +164,6 @@ const showSakuraSelectModal = ref(false);
 const selectedSakuraWorkerId = ref(sakuraWorkspace.value.workers[0]?.id);
 
 const katakanaTranslations = ref<{ [key: string]: string }>({});
-
 const translateKatakanas = async (id: 'baidu' | 'youdao' | 'sakura') => {
   const jpWords = [...katakanas.value.keys()];
   let config: TranslatorConfig;
@@ -242,7 +259,6 @@ const showListModal = ref(false);
           clearable
           size="small"
           style="width: 16em"
-          min="1"
         />
       </c-action-wrapper>
 
@@ -298,22 +314,75 @@ const showListModal = ref(false);
                 />
               </n-button-group>
 
-          <n-flex align="center" :wrap="false">
-            <c-button
-              :disabled="katakanaDeleted.length === 0"
-              label="撤销删除"
-              :round="false"
-              size="small"
-              @action="undoDeleteKatakana"
-            />
-            <n-text
-              v-if="katakanaDeleted.length > 0"
-              depth="3"
-              style="font-size: 12px"
-            >
-              {{ lastDeletedHint }}
-            </n-text>
-          </n-flex>
+              <n-flex align="center" :wrap="false">
+                <c-button
+                  :disabled="katakanaDeleted.length === 0"
+                  label="撤销删除"
+                  :round="false"
+                  size="small"
+                  @action="undoDeleteKatakana"
+                />
+                <n-text
+                  v-if="katakanaDeleted.length > 0"
+                  depth="3"
+                  style="font-size: 12px; margin-left: 8px"
+                >
+                  {{ lastDeletedHint }}
+                </n-text>
+              </n-flex>
+            </n-flex>
+          </template>
+          <template v-else-if="katakanaMode === 'ai'">
+            <n-flex vertical>
+              <n-radio-group
+                v-model="katakanaWorkspace.aiTranslationType"
+                size="small"
+                style="margin-bottom: 16px"
+              >
+                <n-radio label="OpenAI" value="openai" />
+                <n-radio label="本地" value="local" />
+              </n-radio-group>
+
+              <template v-if="katakanaWorkspace.aiTranslationType === 'openai'">
+                <n-input
+                  v-model:value="katakanaWorkspace.base_url"
+                  placeholder="请输入Link"
+                  size="small"
+                  style="margin-bottom: 8px"
+                />
+                <n-input
+                  v-model:value="katakanaWorkspace.api_key"
+                  placeholder="请输入API"
+                  size="small"
+                  style="margin-bottom: 16px"
+                />
+              </template>
+              <template
+                v-else-if="katakanaWorkspace.aiTranslationType === 'local'"
+              >
+                <n-input
+                  v-model:value="katakanaWorkspace.base_url"
+                  placeholder="请输入Link"
+                  size="small"
+                  style="margin-bottom: 16px"
+                />
+              </template>
+              <c-button
+                label="开始提取术语表"
+                :round="false"
+                size="small"
+                @action=""
+                style="margin-bottom: 16px"
+              />
+              <n-scrollbar style="max-height: 150px; width: 100%">
+                <n-list>
+                  <n-list-item v-for="(log, index) in []" :key="index">
+                    {{ log }}
+                  </n-list-item>
+                </n-list>
+              </n-scrollbar>
+            </n-flex>
+          </template>
         </n-flex>
       </c-action-wrapper>
     </n-flex>
@@ -326,7 +395,7 @@ const showListModal = ref(false);
         style="max-height: 60vh; max-width: 500px; margin-top: 30px"
       >
         <n-table striped size="small" style="font-size: 12px">
-          <tr v-for="[word, value] in katakanas" :key="word">
+          <tr v-for="[word, number] in katakanas" :key="word">
             <td>
               <c-icon-button
                 tooltip="移除"
@@ -337,7 +406,7 @@ const showListModal = ref(false);
                 @action="katakanaDeleted.push(word)"
               />
             </td>
-            <td nowrap="nowrap">{{ value.count }}</td>
+            <td nowrap="nowrap">{{ number }}</td>
             <td style="min-width: 100px">{{ word }}</td>
             <td nowrap="nowrap">=></td>
             <td style="padding-right: 16px">
