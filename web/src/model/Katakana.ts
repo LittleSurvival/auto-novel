@@ -1,9 +1,5 @@
 export interface KataKanaConfig {
   mode: 'traditional' | 'ai';
-  aiTranslationType: 'openai' | 'local';
-  api_key: 'sk-no-key-required';
-  base_url: 'http://127.0.0.1:8080';
-  model_name: 'glm-4-9b-chat';
   max_workers: 4;
   request_timeout: 120;
   translate_surface_mode: 1;
@@ -11,22 +7,13 @@ export interface KataKanaConfig {
   history: VolumeHistory[];
 }
 
+export type KataKana = {
+  [jp: string]: { zh?: string; info?: string; count: number };
+};
+
 export interface VolumeHistory {
   source: 'tmp' | 'local';
   filename: string;
-  katakanas: Map<string, KataKanaInfo>;
+  katakanas: KataKana;
   date: number;
-}
-
-export interface KataKanaInfo {
-  wordTranslations: {
-    translations: string[];
-    translationNotes: string;
-  };
-  count: number;
-  intelligentSummary: string;
-  gender: string;
-  summary: string;
-  originalContextText: string;
-  translatedContextText: string;
 }

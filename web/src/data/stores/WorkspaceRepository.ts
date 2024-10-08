@@ -1,5 +1,5 @@
 import { useLocalStorage } from '@vueuse/core';
-import { KataKanaConfig, KataKanaInfo, VolumeHistory } from '@/model/KataKana';
+import { KataKanaConfig, VolumeHistory } from '@/model/Katakana';
 
 import {
   GptWorker,
@@ -163,10 +163,6 @@ export const createKataKanaWorkSpaceRepository = (
 ) => {
   const ref = useLocalStorage<KataKanaConfig>('katakana-workspace', {
     mode: 'traditional',
-    aiTranslationType: 'openai',
-    api_key: 'sk-no-key-required',
-    base_url: 'http://127.0.0.1:8080',
-    model_name: 'glm-4-9b-chat',
     max_workers: 4,
     request_timeout: 120,
     translate_surface_mode: 1,
