@@ -10,6 +10,8 @@ import { getFullContent } from '@/util/file';
 import LoadedVolume from './components/LoadedVolume.vue';
 import { KataKana } from '@/model/Katakana';
 import { ref } from 'vue';
+import { LogHelper } from './katakana/helper/LogHelper';
+import { round } from 'lodash-es';
 
 const message = useMessage();
 const isWideScreen = useIsWideScreen();
@@ -17,6 +19,13 @@ const sakuraWorkspace = Locator.sakuraWorkspaceRepository().ref;
 const katakanaWorkspace = Locator.katakanaWorkSpaceRepository().ref;
 
 const loadedVolumes = ref<LoadedVolume[]>([]);
+const katakanasRef = ref<KataKana>({});
+const logger = ref<LogHelper>();
+
+const showSakuraSelectModal = ref(false);
+const selectedSakuraWorkerId = ref(sakuraWorkspace.value.workers[0]?.id);
+
+const katakanaTranslations = ref<{ [key: string]: string }>({});
 
 const KataKanaModeOptions = [
   { value: 'traditional', label: '传统术语表翻译' },
@@ -106,8 +115,12 @@ const customRequest = ({
 };
 
 const katakanaThredhold = ref(10);
+const logs = computed(() => logger.value?.getLogs());
 
-const katakanaMerged = computed(() => {
+const katakanaMerged = () => {
+  if (loadedVolumes.value.length == 0) {
+    katakanasRef.value = {};
+  }
   const map: KataKana = {};
   loadedVolumes.value.forEach(({ katakanas }) => {
     Object.entries(katakanas).forEach(([key, value]) => {
@@ -117,8 +130,8 @@ const katakanaMerged = computed(() => {
       map[key].count += value.count;
     });
   });
-  return map;
-});
+  katakanasRef.value = map;
+};
 
 const katakanaDeleted = ref<string[]>([]);
 const undoDeleteKatakana = () => {
@@ -131,8 +144,11 @@ const lastDeletedHint = computed(() => {
 });
 
 const katakanas = computed(() => {
+  if (loadedVolumes.value.length == 0) {
+    katakanasRef.value = {};
+  }
   return new Map(
-    Object.entries(katakanaMerged.value).filter(
+    Object.entries(katakanasRef.value).filter(
       ([w, c]) =>
         c.count > katakanaThredhold.value && !katakanaDeleted.value.includes(w),
     ),
@@ -150,11 +166,6 @@ const copyTranslationJson = async () => {
   navigator.clipboard.writeText(jsonString);
   message.info('已经将翻译结果复制到剪切板');
 };
-
-const showSakuraSelectModal = ref(false);
-const selectedSakuraWorkerId = ref(sakuraWorkspace.value.workers[0]?.id);
-
-const katakanaTranslations = ref<{ [key: string]: string }>({});
 
 const translateKatakanas = async (id: 'baidu' | 'youdao' | 'sakura') => {
   const jpWords = [...katakanas.value.keys()];
@@ -215,6 +226,7 @@ const showListModal = ref(false);
             :icon="PlusOutlined"
             size="small"
             @click="showListModal = true"
+            style="margin-right: 10px"
           />
           <div>
             <n-upload
@@ -224,7 +236,12 @@ const showListModal = ref(false);
               :custom-request="customRequest"
               :show-file-list="false"
             >
-              <c-button label="加载文件" :icon="PlusOutlined" size="small" />
+              <c-button
+                label="加载文件"
+                :icon="PlusOutlined"
+                size="small"
+                style="margin-right: 10px"
+              />
             </n-upload>
           </div>
           <c-button
@@ -244,8 +261,8 @@ const showListModal = ref(false);
       </n-flex>
     </c-action-wrapper>
 
-    <n-flex vertical>
-      <c-action-wrapper title="次数下限">
+    <c-action-wrapper title="次数下限" style="margin-bottom: 20px">
+      <n-flex align="center">
         <n-input-number
           v-model:value="katakanaThredhold"
           clearable
@@ -253,35 +270,31 @@ const showListModal = ref(false);
           style="width: 16em"
           min="1"
         />
-      </c-action-wrapper>
+      </n-flex>
+    </c-action-wrapper>
 
-      <c-action-wrapper title="操作">
-        <c-button
-          label="复制术语表"
-          :round="false"
-          @action="copyTranslationJson()"
-        />
-        <n-flex vertical>
-          <n-space style="margin-bottom: 16px">
-            <n-button-group size="small">
-              <c-button
-                label="传统模式"
-                :round="false"
-                :type="katakanaMode === 'traditional' ? 'primary' : 'default'"
-                @click="katakanaMode = 'traditional'"
-              />
-              <c-button
-                label="AI模式"
-                :round="false"
-                :type="katakanaMode === 'ai' ? 'primary' : 'default'"
-                @click="katakanaMode = 'ai'"
-              />
-            </n-button-group>
-          </n-space>
-
-          <template v-if="katakanaMode === 'traditional'">
-            <n-flex vertical>
-              <n-button-group size="small" style="margin-bottom: 8px">
+    <c-action-wrapper title="提取器">
+      <n-flex vertical spacing="2" style="margin-left: 12px">
+        <n-flex align="center">
+          <n-button-group size="small">
+            <c-button
+              label="传统模式"
+              :round="false"
+              :type="katakanaMode === 'traditional' ? 'primary' : 'default'"
+              @action="katakanaMode = 'traditional'"
+            />
+            <c-button
+              label="AI模式"
+              :round="false"
+              :type="katakanaMode === 'ai' ? 'primary' : 'default'"
+              @action="katakanaMode = 'ai'"
+            />
+          </n-button-group>
+        </n-flex>
+        <template v-if="katakanaMode === 'traditional'">
+          <n-card shadow="hover" bordered style="padding: auto">
+            <n-flex vertical spacing="12">
+              <n-button-group size="small" style="margin-bottom: 12px">
                 <c-button
                   label="百度翻译"
                   :round="false"
@@ -292,68 +305,94 @@ const showListModal = ref(false);
                   :round="false"
                   @action="translateKatakanas('youdao')"
                 />
-              </n-button-group>
-
-              <n-button-group size="small" style="margin-bottom: 8px">
                 <c-button
                   :label="`Sakura翻译-${selectedSakuraWorkerId ?? '未选中'}`"
                   :round="false"
                   @action="translateKatakanas('sakura')"
                 />
                 <c-button
-                  label="选择翻译器"
+                  label="选择Sakura翻译"
                   :round="false"
                   @action="showSakuraSelectModal = true"
                 />
               </n-button-group>
 
-              <n-flex align="center" :wrap="false">
-                <c-button
-                  :disabled="katakanaDeleted.length === 0"
-                  label="撤销删除"
-                  :round="false"
-                  size="small"
-                  @action="undoDeleteKatakana"
-                />
-                <n-text
-                  v-if="katakanaDeleted.length > 0"
-                  depth="3"
-                  style="font-size: 12px; margin-left: 8px"
-                >
-                  {{ lastDeletedHint }}
-                </n-text>
-              </n-flex>
-            </n-flex>
-          </template>
-          <template v-else-if="katakanaMode === 'ai'">
-            <n-flex vertical>
-              <n-radio-group
-                v-model="katakanaWorkspace.mode"
+              <c-button
+                label="提取术语表"
                 size="small"
-                style="margin-bottom: 16px"
-              >
+                :round="false"
+                @action="katakanaMerged"
+                type="success"
+              />
+            </n-flex>
+          </n-card>
+        </template>
+
+        <template v-else-if="katakanaMode === 'ai'">
+          <n-card shadow="hover">
+            <n-flex vertical spacing="2">
+              <n-radio-group v-model="katakanaWorkspace.mode" size="small">
                 <n-radio label="OpenAI" value="openai" />
                 <n-radio label="本地" value="local" />
               </n-radio-group>
               <c-button
-                label="开始提取术语表"
-                :round="false"
+                label="提取术语表"
                 size="small"
-                @action=""
-                style="margin-bottom: 16px"
+                :round="false"
+                type="success"
+                @action="katakanaMerged"
               />
-              <n-scrollbar style="max-height: 150px; width: 100%">
-                <n-list>
-                  <n-list-item v-for="(log, index) in []" :key="index">
-                    {{ log }}
-                  </n-list-item>
-                </n-list>
-              </n-scrollbar>
+              <template v-if="logs && logs.length > 0">
+                <n-h2>日志</n-h2>
+                <div
+                  style="max-height: 300px; overflow-y: auto"
+                  ref="logContainerRef"
+                >
+                  <div
+                    v-for="log in logs"
+                    :key="log.id"
+                    :class="`log-${log.type}`"
+                  >
+                    <n-p>{{ log.message }}</n-p>
+                  </div>
+                </div>
+              </template>
             </n-flex>
-          </template>
+          </n-card>
+        </template>
+      </n-flex>
+    </c-action-wrapper>
+
+    <c-action-wrapper title="操作">
+      <n-flex align="left">
+        <n-flex align="right" style="margin-left: 24px; margin-top: 10px">
+          <c-button
+            label="复制术语表"
+            size="small"
+            :round="false"
+            @action="copyTranslationJson()"
+            type="primary"
+            style="margin: auto"
+          />
+          <c-button
+            :disabled="katakanaDeleted.length === 0"
+            label="撤销删除"
+            :round="false"
+            size="small"
+            @action="undoDeleteKatakana"
+            style="margin: auto"
+            type="error"
+          />
+          <n-text
+            v-if="katakanaDeleted.length > 0"
+            depth="3"
+            style="font-size: 12px; color: #ff4d4f; margin: 10px"
+          >
+            {{ lastDeletedHint }}
+          </n-text>
         </n-flex>
-      </c-action-wrapper>
-    </n-flex>
+      </n-flex>
+    </c-action-wrapper>
 
     <n-divider />
 
@@ -384,7 +423,7 @@ const showListModal = ref(false);
                 placeholder="请输入中文翻译"
                 :theme-overrides="{
                   border: '0',
-                  color: 'transprent',
+                  color: 'transparent',
                 }"
               />
             </td>
@@ -406,22 +445,22 @@ const showListModal = ref(false);
         <local-volume-list-katakana hide-title @volume-loaded="loadLocalFile" />
       </div>
     </c-drawer-right>
-  </c-layout>
 
-  <c-modal title="选择Sakura翻译器" v-model:show="showSakuraSelectModal">
-    <n-radio-group v-model:value="selectedSakuraWorkerId">
-      <n-flex vertical>
-        <n-radio
-          v-for="worker of sakuraWorkspace.workers"
-          :key="worker.id"
-          :value="worker.id"
-        >
-          {{ worker.id }}
-          <n-text depth="3">
-            {{ worker.endpoint }}
-          </n-text>
-        </n-radio>
-      </n-flex>
-    </n-radio-group>
-  </c-modal>
+    <c-modal title="选择Sakura翻译器" v-model:show="showSakuraSelectModal">
+      <n-radio-group v-model:value="selectedSakuraWorkerId">
+        <n-flex vertical>
+          <n-radio
+            v-for="worker of sakuraWorkspace.workers"
+            :key="worker.id"
+            :value="worker.id"
+          >
+            {{ worker.id }}
+            <n-text depth="3">
+              {{ worker.endpoint }}
+            </n-text>
+          </n-radio>
+        </n-flex>
+      </n-radio-group>
+    </c-modal>
+  </c-layout>
 </template>
