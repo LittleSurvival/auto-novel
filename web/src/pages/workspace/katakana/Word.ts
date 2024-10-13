@@ -74,7 +74,6 @@ export class Word {
       if (lineLength > threshold) {
         continue;
       }
-
       if (contextLength + lineLength > threshold) {
         break;
       }

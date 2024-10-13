@@ -1,4 +1,4 @@
-class TextHelper {
+export class TextHelper {
   // 平假名
   static readonly HIRAGANA: [number, number] = [0x3040, 0x309f];
 

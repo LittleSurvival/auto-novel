@@ -34,6 +34,9 @@ importers:
       '@zip.js/zip.js':
         specifier: ^2.7.52
         version: 2.7.52
+      async-sema:
+        specifier: ^3.1.1
+        version: 3.1.1
       crypto-es:
         specifier: ^2.1.0
         version: 2.1.0
@@ -70,6 +73,9 @@ importers:
       pinia:
         specifier: ^2.2.4
         version: 2.2.4(typescript@5.6.2)(vue@3.5.11(typescript@5.6.2))
+      tiktoken:
+        specifier: ^1.0.17
+        version: 1.0.17
       typescript:
         specifier: ^5.6.2
         version: 5.6.2
@@ -103,6 +109,9 @@ importers:
       vue-tsc:
         specifier: ^2.1.6
         version: 2.1.6(typescript@5.6.2)
+      wanakana:
+        specifier: ^5.3.1
+        version: 5.3.1
     devDependencies:
       '@types/node':
         specifier: ^20.16.10
@@ -913,6 +922,12 @@ packages:
     resolution:
       {
         integrity: sha512-jgsaNduz+ndvGyFt3uSuWqvy4lCnIJiovtouQN5JZHOKCS2QuhEdbcQHFhVksz2N2U9hXJo8odG7ETyWlEeuDw==,
+      }
+
+  async-sema@3.1.1:
+    resolution:
+      {
+        integrity: sha512-tLRNUXati5MFePdAk8dw7Qt7DpxPB60ofAgn8WRhW6a2rcimZnYBP9oxHiv0OHy+Wz7kPMG+t4LGdt31+4EmGg==,
       }
 
   async-validator@4.2.5:
@@ -2200,6 +2215,12 @@ packages:
     engines: { node: '>=10' }
     hasBin: true
 
+  tiktoken@1.0.17:
+    resolution:
+      {
+        integrity: sha512-UuFHqpy/DxOfNiC3otsqbx3oS6jr5uKdQhB/CvDEroZQbVHt+qAK+4JbIooabUWKU9g6PpsFylNu9Wcg4MxSGA==,
+      }
+
   tinybench@2.9.0:
     resolution:
       {
@@ -2542,6 +2563,13 @@ packages:
       }
     peerDependencies:
       vue: ^3.0.11
+
+  wanakana@5.3.1:
+    resolution:
+      {
+        integrity: sha512-OSDqupzTlzl2LGyqTdhcXcl6ezMiFhcUwLBP8YKaBIbMYW1wAwDvupw2T9G9oVaKT9RmaSpyTXjxddFPUcFFIw==,
+      }
+    engines: { node: '>=12' }
 
   webpack-sources@3.2.3:
     resolution:
@@ -3011,6 +3039,8 @@ snapshots:
   argparse@2.0.1: {}
 
   assertion-error@1.1.0: {}
+
+  async-sema@3.1.1: {}
 
   async-validator@4.2.5: {}
 
@@ -3729,6 +3759,8 @@ snapshots:
       commander: 2.20.3
       source-map-support: 0.5.21
 
+  tiktoken@1.0.17: {}
+
   tinybench@2.9.0: {}
 
   tinypool@0.8.4: {}
@@ -3978,6 +4010,8 @@ snapshots:
       vdirs: 0.1.8(vue@3.5.11(typescript@5.6.2))
       vooks: 0.2.12(vue@3.5.11(typescript@5.6.2))
       vue: 3.5.11(typescript@5.6.2)
+
+  wanakana@5.3.1: {}
 
   webpack-sources@3.2.3:
     optional: true
