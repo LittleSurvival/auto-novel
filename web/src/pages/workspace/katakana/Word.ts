@@ -9,7 +9,7 @@ export class Word {
   context_translation: string[];
   surface: string;
   surface_romaji: string;
-  surface_translation: string;
+  surface_translation: string[];
   surface_translation_description: string;
   ner_type: string;
   attribute: string;
@@ -27,7 +27,7 @@ export class Word {
     this.context_translation = [];
     this.surface = '';
     this.surface_romaji = '';
-    this.surface_translation = '';
+    this.surface_translation = [];
     this.surface_translation_description = '';
     this.ner_type = '';
     this.attribute = '';

@@ -1,11 +1,12 @@
-import fetch, { RequestInit, Response } from 'node-fetch';
 import Bottleneck from 'bottleneck';
 import { Sema } from 'async-sema';
 import wanakana from 'wanakana';
-import { LogHelper } from './helper/LogHelper'; // Adjust the path as needed
-import { TextHelper } from './helper/TextHelper'; // Implement this utility as needed
+import { LogHelper } from './helper/LogHelper';
+import { TextHelper } from './helper/TextHelper';
+import { Word } from './Word';
+import { Locator } from '@/data';
+import { PromptHelper } from './helper/PromptHelper';
 
-// Define necessary interfaces and enums
 interface Config {
   api_key: string;
   base_url: string;
@@ -34,51 +35,8 @@ enum ProcessMode {
   QUICK = 2,
 }
 
-interface Message {
-  role: string;
-  content: string;
-}
-
-interface CompletionResponse {
-  usage: {
-    completion_tokens: number;
-  };
-  choices: {
-    message: Message;
-  }[];
-}
-
-interface Word {
-  surface: string;
-  surface_translation: string;
-  surface_translation_description: string;
-  surface_romaji: string;
-  ner_type: string;
-  context: string[];
-  context_translation: string[];
-  attribute: string;
-  context_summary: string;
-  llmresponse_translate_surface: any;
-  llmresponse_translate_context: any;
-  llmresponse_summarize_context: any;
-
-  clip_context(length: number): string[];
-}
-
 export class WordProcess {
   private static MAX_RETRY: number = 3;
-
-  // Task Types
-  private static TASK_TYPE_API_TEST: TaskType = TaskType.API_TEST;
-  private static TASK_TYPE_SUMMARIZE_CONTEXT: TaskType =
-    TaskType.SUMMARIZE_CONTEXT;
-  private static TASK_TYPE_TRANSLATE_SURFACE: TaskType =
-    TaskType.TRANSLATE_SURFACE;
-  private static TASK_TYPE_TRANSLATE_CONTEXT: TaskType =
-    TaskType.TRANSLATE_CONTEXT;
-
-  // Process Modes
-  private static PROCESS_MODE = ProcessMode;
 
   // Request configuration parameters
   private LLMCONFIG: { [key: number]: LLMConfig } = {};
@@ -91,15 +49,20 @@ export class WordProcess {
   private request_frequency_threshold: number;
 
   // Prompt templates
-  private blacklist: string = '';
-  private prompt_summarize_context: string = '';
-  private prompt_translate_context: string = '';
-  private prompt_translate_surface: string = '';
+  private prompt_summarize_context: string =
+    PromptHelper.PROMPT_SUMMARIZE_CONTEXT;
+  private prompt_translate_context: string =
+    PromptHelper.PROMPT_TRANSLATE_CONTEXT;
+  private prompt_translate_surface_common: string =
+    PromptHelper.PROMPT_TRANSLATE_SURFACE_COMMON;
+  private prompt_translate_surface_person: string =
+    PromptHelper.PROMPT_TRANSLATE_SURFACE_PERSON;
 
   // Rate limiting and semaphore
   private semaphore: Sema;
   private limiter: Bottleneck;
   private logger: LogHelper;
+  private api;
 
   constructor(config: Config, logger: LogHelper) {
     this.logger = logger;
@@ -128,6 +91,10 @@ export class WordProcess {
           ? 1000 / this.request_frequency_threshold
           : 1000,
     });
+    this.api = Locator.openAiRepositoryFactory(
+      this.base_url,
+      this.api_key || 'no-key',
+    );
   }
 
   private initializeLLMConfig() {
@@ -158,37 +125,6 @@ export class WordProcess {
       MAX_TOKENS: 1024,
       FREQUENCY_PENALTY: 0,
     };
-  }
-
-  async loadPromptSummarizeContext(filepath: string): Promise<void> {
-    try {
-      const fs = await import('fs').then((mod) => mod.promises);
-      this.prompt_summarize_context = await fs.readFile(filepath, 'utf-8');
-    } catch (e: any) {
-      this.logger.error(`加载配置文件时发生错误 - ${e.stack || e}`);
-    }
-  }
-
-  async loadPromptTranslateContext(filepath: string): Promise<void> {
-    try {
-      const fs = await import('fs').then((mod) => mod.promises);
-      this.prompt_translate_context = await fs.readFile(filepath, 'utf-8');
-    } catch (e: any) {
-      this.logger.error(`加载配置文件时发生错误 - ${e.stack || e}`);
-    }
-  }
-
-  /**
-   * Loads the prompt template for translating surface from a file.
-   * @param filepath - Path to the prompt file.
-   */
-  async loadPromptTranslateSurface(filepath: string): Promise<void> {
-    try {
-      const fs = await import('fs').then((mod) => mod.promises);
-      this.prompt_translate_surface = await fs.readFile(filepath, 'utf-8');
-    } catch (e: any) {
-      this.logger.error(`加载配置文件时发生错误 - ${e.stack || e}`);
-    }
   }
 
   /**
@@ -239,117 +175,43 @@ export class WordProcess {
     let error = null;
 
     try {
-      llm_request = {
-        model: this.model_name,
-        stream: false,
-        temperature: this.LLMCONFIG[task_type].TEMPERATURE,
-        top_p: this.LLMCONFIG[task_type].TOP_P,
-        max_tokens: this.LLMCONFIG[task_type].MAX_TOKENS,
-        frequency_penalty: retry
-          ? this.LLMCONFIG[task_type].FREQUENCY_PENALTY + 0.2
-          : this.LLMCONFIG[task_type].FREQUENCY_PENALTY,
-        messages: [
-          {
-            role: 'user',
-            content: content,
-          },
-        ],
-      };
-
       const controller = new AbortController();
       const timeout = setTimeout(() => {
         controller.abort();
       }, this.request_timeout * 1000);
 
-      const response: Response = await fetch(
-        `${this.base_url}/v1/chat/completions`,
+      const completions = await this.api.createChatCompletions(
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.api_key}`,
-          },
-          body: JSON.stringify(llm_request),
+          model: this.model_name,
+          messages: [
+            {
+              role: 'user',
+              content: content,
+            },
+          ],
+          temperature: this.LLMCONFIG[task_type].TEMPERATURE,
+          top_p: this.LLMCONFIG[task_type].TOP_P,
+          max_tokens: this.LLMCONFIG[task_type].MAX_TOKENS,
+          frequency_penalty: retry
+            ? this.LLMCONFIG[task_type].FREQUENCY_PENALTY + 0.2
+            : this.LLMCONFIG[task_type].FREQUENCY_PENALTY,
+        },
+        {
           signal: controller.signal,
+          timeout: false,
         },
       );
 
       clearTimeout(timeout);
 
-      llm_response = await response.json();
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      usage = llm_response.usage;
-      message = llm_response.choices[0].message;
+      llm_request = completions.completion_probabilities;
+      llm_response = completions.choices;
+      usage = completions.usage.completion_tokens;
+      message = completions.choices[0].message.content!!;
     } catch (e: any) {
       error = e;
     } finally {
       return { usage, message, llm_request, llm_response, error };
-    }
-  }
-
-  /**
-   * Sets up the request limiter based on the number of available slots.
-   */
-  async setRequestLimiter(): Promise<void> {
-    let num = -1;
-    let data: any[] = [];
-
-    try {
-      const url = this.base_url.endsWith('/v1')
-        ? this.base_url.replace('/v1', '')
-        : this.base_url;
-
-      const response = await fetch(`${url}/slots`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.api_key}`,
-        },
-        // node-fetch doesn't support timeout directly, use AbortController if needed
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      data = await response.json();
-      num = Array.isArray(data) && data.length > 0 ? data.length : num;
-    } catch (e: any) {
-      this.logger.debug(`${e.stack || e}`);
-    } finally {
-      if (num > 0) {
-        this.logger.info(``);
-        this.logger.info(
-          `检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]${num}[/] 次/秒 ...`,
-        );
-        this.logger.info(``);
-        this.request_frequency_threshold = num;
-      }
-
-      // Set up the semaphore based on the updated request_frequency_threshold
-      if (this.request_frequency_threshold > 1) {
-        this.semaphore = new Sema(this.request_frequency_threshold);
-        this.limiter = new Bottleneck({
-          maxConcurrent: this.request_frequency_threshold,
-          minTime: 1000 / this.request_frequency_threshold, // Convert to ms
-        });
-      } else if (this.request_frequency_threshold > 0) {
-        this.semaphore = new Sema(1);
-        this.limiter = new Bottleneck({
-          maxConcurrent: 1,
-          minTime: 1000 / this.request_frequency_threshold,
-        });
-      } else {
-        this.semaphore = new Sema(1);
-        this.limiter = new Bottleneck({
-          maxConcurrent: 1,
-          minTime: 1000, // Default to 1 request per second
-        });
-      }
     }
   }
 
@@ -359,14 +221,13 @@ export class WordProcess {
    */
   async apiTest(): Promise<boolean> {
     await this.semaphore.acquire();
-    let requestText = '',
-      responseText = '';
+
     try {
       let result = false;
       let llm_request: any = null;
       let llm_response: any = null;
 
-      const testPrompt = this.prompt_translate_surface
+      const testPrompt = this.prompt_translate_surface_person
         .replace('{surface}', 'ダリヤ')
         .replace('{context}', '魔導具師ダリヤはうつむかない');
 
@@ -415,9 +276,17 @@ export class WordProcess {
     let requestText = '',
       responseText = '';
     try {
-      const prompt = this.prompt_translate_surface
-        .replace('{surface}', word.surface)
-        .replace('{context}', word.clip_context(256).join('\n'));
+      let prompt: string;
+      if (word.ner_type !== 'PER') {
+        prompt = this.prompt_translate_surface_common.replace(
+          '{surface}',
+          word.surface,
+        ); // Handle common translation
+      } else {
+        prompt = this.prompt_translate_surface_person
+          .replace('{attribute}', word.attribute)
+          .replace('{surface}', word.surface); // Handle person-specific translation
+      }
 
       const { usage, message, llm_request, llm_response, error } =
         await this.request(prompt, TaskType.TRANSLATE_SURFACE, retry);
@@ -438,36 +307,22 @@ export class WordProcess {
       }
 
       const data = JSON.parse(
-        TextHelper.fix_broken_json_string(message.content.trim()),
+        TextHelper.fix_broken_json_string(message.trim()),
       );
 
-      // Extract results
-      word.surface_translation = data.translation?.trim() || '';
+      word.surface_romaji =
+        data.romaji && data.romaji !== word.surface
+          ? data.romaji
+          : await this.convertToRomaji(word.surface); // Updated Romaji extraction
+      word.surface_translation = [
+        data.translation_1?.trim() || '',
+        data.translation_2?.trim() || '',
+      ]; // Updated to handle multiple translations
       word.surface_translation_description = data.description?.trim() || '';
       word.llmresponse_translate_surface = llm_response;
-
-      // Check for unwanted keywords in description
-      if (
-        word.ner_type !== 'PER' &&
-        word.surface_translation_description !== '' &&
-        this.checkKeywordInDescription(word, [
-          '语气词',
-          '拟声词',
-          '感叹词',
-          '形容词',
-        ])
-      ) {
-        word.ner_type = '';
-        this.logger.debug(
-          `[词语翻译] 已剔除 - ${word.surface} - ${word.surface_translation_description}`,
-        );
-      }
-
-      // Generate Romaji using Kuroshiro
-      word.surface_romaji = await this.convertToRomaji(word.surface);
     } catch (e: any) {
       this.logger.warning(
-        `[词语翻译] 子任务执行失败，稍后将重试 ... ${e.stack || e}`,
+        `[Translate Surface] Subtask failed, will retry later... ${e.stack || e}`,
       );
       this.logger.debug(`llm_request - ${JSON.stringify(requestText)}`);
       this.logger.debug(`llm_response - ${JSON.stringify(responseText)}`);
@@ -736,8 +591,8 @@ export class WordProcess {
           );
         }
 
-        word.attribute = result.gender?.trim() || '';
-        word.context_summary = result.summary?.trim() || '';
+        word.attribute = result['sex'].trim() || '';
+        word.context_summary = result.trim() || '';
         word.llmresponse_summarize_context = llm_response;
       }
     } catch (e: any) {
