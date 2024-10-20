@@ -7,6 +7,8 @@ import {
   TranslateJob,
   TranslateJobRecord,
 } from '@/model/Translator';
+import { KataKanaWorker } from '@/pages/workspace/katakanaRewrite/KatakanaWorker';
+import { GlossaryWorker } from '../../model/Katakana';
 
 interface Workspace<T> {
   workers: T[];
@@ -163,10 +165,8 @@ export const createKataKanaWorkSpaceRepository = (
 ) => {
   const ref = useLocalStorage<KataKanaConfig>('katakana-workspace', {
     mode: 'traditional',
-    max_workers: 4,
-    request_timeout: 120,
-    translate_surface_mode: 1,
-    translate_context_mode: 1,
+    currentWorker: 0,
+    workers: [],
     history: [],
   });
   if (migrate) {

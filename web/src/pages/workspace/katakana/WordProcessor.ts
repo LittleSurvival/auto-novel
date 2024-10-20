@@ -1,4 +1,3 @@
-import fetch, { RequestInit, Response } from 'node-fetch';
 import Bottleneck from 'bottleneck';
 import { Sema } from 'async-sema';
 import wanakana from 'wanakana';
