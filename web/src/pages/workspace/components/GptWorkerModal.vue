@@ -60,8 +60,10 @@ const formRules: FormRules = {
       trigger: 'input',
     },
   ],
-  model: [emptyCheck('模型')],
-  endpoint: [emptyCheck('链接')],
+  modelWeb: [emptyCheck('模型')],
+  modelApi: [emptyCheck('模型')],
+  endpointWeb: [emptyCheck('链接')],
+  endpointApi: [emptyCheck('链接')],
   key: [
     emptyCheck('Key'),
     {
@@ -70,7 +72,7 @@ const formRules: FormRules = {
         workspaceRef.value.workers
           .filter(({ id }) => id !== props.worker?.id)
           .find(({ key }) => key === value) === undefined,
-      message: '有重复的Key，请确保使用的API支持并发',
+      message: '有重复的Key (仅作为不支持并发的api的提醒)',
       trigger: 'input',
     },
   ],
@@ -135,14 +137,14 @@ const verb = computed(() => (props.worker === undefined ? '添加' : '更新'));
         />
       </n-form-item-row>
 
-      <n-form-item-row path="model" label="模型">
+      <n-form-item-row path="modelApi" label="模型">
         <n-input
           v-model:value="formValue.model"
           placeholder="模型名称"
           :input-props="{ spellcheck: false }"
         />
       </n-form-item-row>
-      <n-form-item-row path="endpoint" label="链接">
+      <n-form-item-row path="endpointApi" label="链接">
         <n-input
           v-model:value="formValue.endpoint"
           placeholder="兼容OpenAI的API链接，默认使用deepseek"
@@ -164,7 +166,11 @@ const verb = computed(() => (props.worker === undefined ? '添加' : '更新'));
     </n-form>
 
     <template #action>
-      <c-button :label="verb" type="primary" @action="submit" />
+      <c-button
+        :label="worker === undefined ? '添加' : '更新'"
+        type="primary"
+        @action="submit"
+      />
     </template>
   </c-modal>
 </template>
