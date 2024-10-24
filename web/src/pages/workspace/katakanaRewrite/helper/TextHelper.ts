@@ -245,7 +245,7 @@ export class TextHelper {
   }
 
   // 修复不合规的JSON字符串
-  static fix_broken_json_string(jsonstring: string): string {
+  static fixBrokenJsonString(jsonstring: string): string {
     // 移除首尾空白符（含空格、制表符、换行符）
     jsonstring = jsonstring.trim();
 
@@ -404,5 +404,16 @@ export class TextHelper {
 
   static escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  static is_valid_japanese_word(
+    surface: string,
+    blacklist: string[] = [],
+  ): boolean {
+    return (
+      surface.length > 1 &&
+      !blacklist.includes(surface) &&
+      TextHelper.has_any_japanese(surface)
+    );
   }
 }

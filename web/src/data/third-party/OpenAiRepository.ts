@@ -3,7 +3,11 @@ import ky, { HTTPError, Options } from 'ky';
 
 import { parseEventStream, safeJson } from '@/util';
 
-export const createOpenAiRepository = (endpoint: string, key: string) => {
+export const createOpenAiRepository = (
+  endpoint: string,
+  key: string,
+  timeout: number = 600_000,
+) => {
   const client = ky.create({
     prefixUrl: endpoint,
     headers: {
@@ -11,7 +15,7 @@ export const createOpenAiRepository = (endpoint: string, key: string) => {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
-    timeout: 600_000,
+    timeout: timeout,
     retry: 0,
   });
 

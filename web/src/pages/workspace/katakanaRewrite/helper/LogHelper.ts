@@ -39,6 +39,10 @@ export class LogHelper {
     return this.logs.value;
   }
 
+  clearLogs() {
+    this.logs.value = [];
+  }
+
   /**
      純手工進度條
      */

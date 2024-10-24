@@ -7,5 +7,5 @@ export {
 export {
   createGptWorkspaceRepository,
   createSakuraWorkspaceRepository,
-  createKataKanaWorkSpaceRepository,
+  createGlossaryWorkSpaceRepository,
 } from './WorkspaceRepository';

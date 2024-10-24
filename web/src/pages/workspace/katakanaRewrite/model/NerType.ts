@@ -4,7 +4,8 @@ export enum NERTYPE {
   LOC = 'LOC', //表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
   PRD = 'PRD', //表示产品，如"iPhone"、"Windows操作系统"等。
   EVT = 'EVT', //表示事件，如"奥运会"、"地震"等。
-  EMPTY = '', //用於偵錯
+  UNKNOWN = 'UNKNOWN', //未知，用於傳統片假名分詞
+  EMPTY = '', //用於刪除指定詞語
 }
 
 export const NERTYPECHINESE: { [key: string]: string } = {

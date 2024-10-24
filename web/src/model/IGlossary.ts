@@ -1,12 +1,12 @@
 import { translate } from '../domain/translate/Translate';
-export interface KataKanaConfig {
+export interface GlossaryConfig {
   mode: 'traditional' | 'ai';
   currentworker: number;
   workers: GlossaryWorker[];
   history: VolumeHistory[];
 }
 
-export type KataKana = {
+export type WGlossary = {
   [jp: string]: { zh?: string; info?: string; count: number };
 };
 
@@ -27,6 +27,6 @@ export interface GlossaryWorker {
 export interface VolumeHistory {
   source: 'tmp' | 'local';
   filename: string;
-  katakanas: KataKana;
+  katakanas: WGlossary;
   date: number;
 }

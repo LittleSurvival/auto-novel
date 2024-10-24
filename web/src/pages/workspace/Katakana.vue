@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { ref } from 'vue';
 import { DeleteOutlineOutlined, PlusOutlined } from '@vicons/material';
 import { UploadCustomRequestOptions } from 'naive-ui';
 
@@ -8,22 +9,22 @@ import { Glossary } from '@/model/Glossary';
 import { useIsWideScreen } from '@/pages/util';
 import { getFullContent } from '@/util/file';
 import LoadedVolume from './components/LoadedVolume.vue';
-import { KataKana } from '@/model/Katakana';
-import { ref } from 'vue';
-import { LogHelper } from './katakana/helper/LogHelper';
-import { round } from 'lodash-es';
+import { WGlossary } from '@/model/IGlossary';
+import { LogHelper } from './katakanaRewrite/helper/LogHelper';
+import { GlossaryGenerator } from './katakanaRewrite/GlossaryGenerator';
 
 const message = useMessage();
 const isWideScreen = useIsWideScreen();
 const sakuraWorkspace = Locator.sakuraWorkspaceRepository().ref;
-const katakanaWorkspace = Locator.katakanaWorkSpaceRepository().ref;
+const glossaryWorkspace = Locator.glossaryWorkSpaceRepository().ref;
 
 const loadedVolumes = ref<LoadedVolume[]>([]);
-const katakanasRef = ref<KataKana>({});
+const wGlossaryRef = ref<WGlossary>({});
 const logger = ref<LogHelper>();
 
 const showSakuraSelectModal = ref(false);
 const selectedSakuraWorkerId = ref(sakuraWorkspace.value.workers[0]?.id);
+const selectedGlossaryWorker = ref(glossaryWorkspace.value.workers[0]);
 
 const katakanaTranslations = ref<{ [key: string]: string }>({});
 
@@ -31,33 +32,33 @@ const KataKanaModeOptions = [
   { value: 'traditional', label: '传统术语表翻译' },
   { value: 'ai', label: 'AI智能翻译' },
 ];
-const katakanaMode = ref<'traditional' | 'ai'>(katakanaWorkspace.value.mode);
+const katakanaMode = ref<'traditional' | 'ai'>(glossaryWorkspace.value.mode);
 
 interface LoadedVolume {
   source: 'tmp' | 'local';
   filename: string;
   content: string;
-  katakanas: KataKana;
+  glossary: WGlossary;
 }
 
-const countKatakana = (content: string) => {
-  const regexp = /[\u30A0-\u30FF]{2,}/g;
-  const matches = content.matchAll(regexp);
-  const katakanaCounter: KataKana = {};
-  for (const match of matches) {
-    const w = match[0];
-    if (katakanaCounter[w]) {
-      katakanaCounter[w].count++;
-    } else {
-      katakanaCounter[w] = { count: 1 };
-    }
+const loadGlossary = async () => {
+  const logger = new LogHelper();
+
+  if (loadedVolumes.value.length <= 0) {
+    logger.error('沒有載入的小說 結束');
   }
-  const sortedKatakanaCounter = Object.fromEntries(
-    Object.entries(katakanaCounter).sort(
-      ([_w1, c1], [_w2, c2]) => c2.count - c1.count,
-    ),
+
+  const generator = new GlossaryGenerator(
+    selectedGlossaryWorker.value,
+    logger,
+    [],
   );
-  return sortedKatakanaCounter;
+  const glossary =
+    glossaryWorkspace.value.mode == 'traditional'
+      ? await generator.loadKataKanas(loadedVolumes.value[0].content)
+      : await generator.loadGlossary(loadedVolumes.value[0].content);
+
+  wGlossaryRef.value = glossary;
 };
 
 const loadVolume = async (
@@ -79,7 +80,7 @@ const loadVolume = async (
     source,
     filename,
     content,
-    katakanas: countKatakana(content),
+    glossary: {},
   });
 };
 
@@ -117,22 +118,6 @@ const customRequest = ({
 const katakanaThredhold = ref(10);
 const logs = computed(() => logger.value?.getLogs());
 
-const katakanaMerged = () => {
-  if (loadedVolumes.value.length == 0) {
-    katakanasRef.value = {};
-  }
-  const map: KataKana = {};
-  loadedVolumes.value.forEach(({ katakanas }) => {
-    Object.entries(katakanas).forEach(([key, value]) => {
-      if (!map[key]) {
-        map[key] = { count: 0 };
-      }
-      map[key].count += value.count;
-    });
-  });
-  katakanasRef.value = map;
-};
-
 const katakanaDeleted = ref<string[]>([]);
 const undoDeleteKatakana = () => {
   katakanaDeleted.value.pop();
@@ -143,38 +128,27 @@ const lastDeletedHint = computed(() => {
   return `${last} => ${katakanaTranslations.value[last]}`;
 });
 
-const katakanas = computed(() => {
-  if (loadedVolumes.value.length == 0) {
-    katakanasRef.value = {};
-  }
-  return new Map(
-    Object.entries(katakanasRef.value).filter(
-      ([w, c]) =>
-        c.count > katakanaThredhold.value && !katakanaDeleted.value.includes(w),
-    ),
-  );
-});
-
 const copyTranslationJson = async () => {
   const obj = Object.fromEntries(
-    Array.from(katakanas.value).map(([key]) => [
+    Object.keys(wGlossaryRef.value).map((key) => [
       key,
-      katakanaTranslations.value[key] ?? '',
+      wGlossaryRef.value[key].zh ?? '',
     ]),
   );
   const jsonString = Glossary.encodeToText(obj);
-  navigator.clipboard.writeText(jsonString);
+  await navigator.clipboard.writeText(jsonString);
   message.info('已经将翻译结果复制到剪切板');
 };
 
 const translateKatakanas = async (id: 'baidu' | 'youdao' | 'sakura') => {
-  const jpWords = [...katakanas.value.keys()];
+  const jpWords = Object.keys(wGlossaryRef.value);
   let config: TranslatorConfig;
+
   if (id === 'sakura') {
     const worker = sakuraWorkspace.value.workers.find(
       (it) => it.id === selectedSakuraWorkerId.value,
     );
-    if (worker === undefined) {
+    if (!worker) {
       message.error('未选择Sakura翻译器');
       return;
     }
@@ -187,15 +161,16 @@ const translateKatakanas = async (id: 'baidu' | 'youdao' | 'sakura') => {
   } else {
     config = { id };
   }
+
   try {
     const translator = await Translator.create(config, false);
     const zhWords = await translator.translate(jpWords, {});
 
-    const jpToZh: { [key: string]: string } = {};
     jpWords.forEach((jpWord, index) => {
-      jpToZh[jpWord] = zhWords[index];
+      if (wGlossaryRef.value[jpWord]) {
+        wGlossaryRef.value[jpWord].zh = zhWords[index];
+      }
     });
-    katakanaTranslations.value = jpToZh;
   } catch (e: any) {
     message.error(`翻译器错误：${e}`);
   }
@@ -321,7 +296,7 @@ const showListModal = ref(false);
                 label="提取术语表"
                 size="small"
                 :round="false"
-                @action="katakanaMerged"
+                @action=""
                 type="success"
               />
             </n-flex>
@@ -331,7 +306,7 @@ const showListModal = ref(false);
         <template v-else-if="katakanaMode === 'ai'">
           <n-card shadow="hover">
             <n-flex vertical spacing="2">
-              <n-radio-group v-model="katakanaWorkspace.mode" size="small">
+              <n-radio-group v-model="glossaryWorkspace.mode" size="small">
                 <n-radio label="OpenAI" value="openai" />
                 <n-radio label="本地" value="local" />
               </n-radio-group>
@@ -340,7 +315,7 @@ const showListModal = ref(false);
                 size="small"
                 :round="false"
                 type="success"
-                @action="katakanaMerged"
+                @action="loadGlossary"
               />
               <template v-if="logs && logs.length > 0">
                 <n-h2>日志</n-h2>
@@ -396,29 +371,28 @@ const showListModal = ref(false);
 
     <n-divider />
 
-    <div v-if="katakanas.size !== 0">
-      <n-scrollbar
-        trigger="none"
-        style="max-height: 60vh; max-width: 500px; margin-top: 30px"
-      >
-        <n-table striped size="small" style="font-size: 12px">
-          <tr v-for="[word, value] in katakanas" :key="word">
-            <td>
-              <c-icon-button
-                tooltip="移除"
-                :icon="DeleteOutlineOutlined"
-                text
-                size="small"
-                type="error"
-                @action="katakanaDeleted.push(word)"
-              />
-            </td>
-            <td nowrap="nowrap">{{ value.count }}</td>
-            <td style="min-width: 100px">{{ word }}</td>
-            <td nowrap="nowrap">=></td>
-            <td style="padding-right: 16px">
+    <div v-if="Object.keys(wGlossaryRef.value).length > 0">
+      <n-scrollbar trigger="none" class="max-h-[60vh] max-w-[500px] mt-8">
+        <!-- <n-table striped size="small" class="text-xs">
+          <tbody>
+            <tr v-for="[jp, { zh, info, count }] in Object.entries(wGlossaryRef)" :key="jp">
+              <td>
+                <n-button
+                  text
+                  size="small"
+                  type="error"
+                  @click="katakanaDeleted.push(jp as string)"
+                >
+                  <template #icon>
+                    <n-icon><delete-outline-outlined /></n-icon>
+                  </template>
+                </n-button>
+              </td>
+              <td class="whitespace-nowrap">{{ count }}</td>
+              <td class="min-w-[100px]">{{ zh }}</td>
+              <td class="whitespace-nowrap">=></td>
               <n-input
-                v-model:value="katakanaTranslations[word]"
+                v-model:value="wGlossaryRef[jp].zh"
                 size="tiny"
                 placeholder="请输入中文翻译"
                 :theme-overrides="{
@@ -426,9 +400,9 @@ const showListModal = ref(false);
                   color: 'transparent',
                 }"
               />
-            </td>
-          </tr>
-        </n-table>
+            </tr>
+          </tbody>
+        </n-table> -->
       </n-scrollbar>
     </div>
 

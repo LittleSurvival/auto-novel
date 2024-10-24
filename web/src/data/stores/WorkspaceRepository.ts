@@ -1,5 +1,5 @@
 import { useLocalStorage } from '@vueuse/core';
-import { KataKanaConfig, VolumeHistory } from '@/model/Katakana';
+import { GlossaryConfig, VolumeHistory } from '@/model/IGlossary';
 
 import {
   GptWorker,
@@ -7,8 +7,7 @@ import {
   TranslateJob,
   TranslateJobRecord,
 } from '@/model/Translator';
-import { KataKanaWorker } from '@/pages/workspace/katakanaRewrite/KatakanaWorker';
-import { GlossaryWorker } from '../../model/Katakana';
+import { GlossaryWorker } from '../../model/IGlossary';
 
 interface Workspace<T> {
   workers: T[];
@@ -160,15 +159,30 @@ export const createSakuraWorkspaceRepository = () =>
     },
   );
 
-export const createKataKanaWorkSpaceRepository = (
-  migrate?: (ref: KataKanaConfig) => void,
+export const createGlossaryWorkSpaceRepository = (
+  migrate?: (ref: GlossaryConfig) => void,
 ) => {
-  const ref = useLocalStorage<KataKanaConfig>('katakana-workspace', {
+  const ref = useLocalStorage<GlossaryConfig>('glossary-workspace', {
     mode: 'traditional',
-    currentWorker: 0,
-    workers: [],
+    currentworker: 0,
+    workers: [
+      {
+        type: 'local',
+        ner: 'traditional',
+        apikey: 'sk-no-key-required',
+        baseurl: 'http://localhost:8080/v1',
+        modelname: 'glm-4-9b-chat',
+        countthreshold: 3,
+        timeout: 180,
+        requestfrequency: 4,
+        translatesurface: true,
+        translatecontentper: true,
+        translatecontentother: true,
+      },
+    ],
     history: [],
   });
+
   if (migrate) {
     migrate(ref.value);
   }
@@ -183,7 +197,7 @@ export const createKataKanaWorkSpaceRepository = (
     );
   };
 
-  const updateSettings = (newSettings: Partial<KataKanaConfig>) => {
+  const updateSettings = (newSettings: Partial<GlossaryConfig>) => {
     ref.value = { ...ref.value, ...newSettings };
   };
 

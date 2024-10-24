@@ -1,14 +1,10 @@
-import {
-  GlossaryWorker,
-  KataKana,
-  KataKanaConfig,
-} from '../../../model/Katakana';
-import type { DefineComponent } from 'vue';
+import { GlossaryWorker, WGlossary } from '../../../model/IGlossary';
 import { LogHelper } from './helper/LogHelper';
-import { Word } from '../katakana/Word';
+import { Word } from './model/Word';
 import { TextHelper } from './helper/TextHelper';
-import { isHiragana, isJapanese } from 'wanakana';
 import { NERTYPE, NERTYPECHINESE } from './model/NerType';
+import { GlosssaryContextProcessor, TaskType } from './GlossaryContextProcess';
+import { GlossaryNerProcessor } from './GlossaryNerProcessor';
 
 export enum LANGUAGE {
   ZH = 'ZH',
@@ -24,19 +20,32 @@ const LANGUAGETEXT = {
   KR: '韓文',
 };
 
-export class KataKanaWorker {
+export class GlossaryGenerator {
   private logger: LogHelper;
   private config: GlossaryWorker;
+  private contextProcessor: GlosssaryContextProcessor;
+  private nerProcessor: GlossaryNerProcessor;
+  private blacklist: string[] = [];
 
-  constructor(config: GlossaryWorker, logger: LogHelper) {
+  constructor(config: GlossaryWorker, logger: LogHelper, blacklist: string[]) {
     this.logger = logger;
+    this.logger.clearLogs();
     this.config = config;
+    this.blacklist = blacklist;
+
+    this.contextProcessor = new GlosssaryContextProcessor(config, logger);
+    this.nerProcessor = new GlossaryNerProcessor(config, logger);
+
+    this.contextProcessor.loadBlackList(this.blacklist);
+    this.nerProcessor.loadBlackList(this.blacklist);
   }
 
-  loadKataKana = async (
-    config: GlossaryWorker,
-    content: string,
-  ): Promise<KataKana> => {
+  loadKataKanas = async (content: string): Promise<WGlossary> => {
+    const words = await this.nerProcessor.generateWord(content);
+    return this.wordsToGlossary(words);
+  };
+
+  loadGlossary = async (content: string): Promise<WGlossary> => {
     let words: Word[] = [];
     const [contentLines, names] = await this.processText(content);
 
@@ -49,7 +58,7 @@ export class KataKanaWorker {
       this.logger.info(
         `偵測文本為 ${LANGUAGETEXT[language]}, 總佔比 ${propotion}%`,
       );
-      if (propotion < 70) {
+      if (propotion < 75) {
         this.logger.warning(
           '這可能是多語言文本，目前僅支持單語言文本識別，以占比最高者為準',
         );
@@ -57,12 +66,14 @@ export class KataKanaWorker {
     }
 
     this.logger.info('查找名詞實體');
-    //TODO words = NER;
+    this.nerProcessor.generateWord(content);
 
     //Debug mode for threshold(Deleted)
 
     this.logger.info('消去重複字和計算詞彙出現次數');
-    words = await this.mergeAndCount(words, contentLines, language);
+    if (this.config.ner != 'traditional') {
+      words = await this.mergeAndCount(words, contentLines, language);
+    } else this.logger.info(`NER分詞模式為傳統 查找時已完成此步驟`);
 
     this.logger.info('執行查找上下文');
     this.logger.startProgress('查找上下文', words.length);
@@ -76,7 +87,7 @@ export class KataKanaWorker {
     //使用上下文還原詞根，僅對日文使用
     if (language == LANGUAGE.JP) {
       this.logger.info('執行還原詞根');
-      //words = words = G.ner.lemmatize_words_by_morphology(words, input_lines)
+      words = this.lemmatizeWordsByMorphology(words);
       words = this.removeWordsByNerType(words, NERTYPE.EMPTY);
       words = await this.mergeAndCount(words, contentLines, language);
       this.logger.info('還原詞根 已完成');
@@ -90,14 +101,16 @@ export class KataKanaWorker {
     }
 
     //詞頻篩選
-    this.logger.info(`執行詞頻篩選 當前設置詞頻為 出現${config}次`);
+    this.logger.info(
+      `執行詞頻篩選 當前設置詞頻為 出現${this.config.countthreshold}次`,
+    );
     const [filteredWords, deletedCount] = this.removeWordsByCountThresHold(
       words,
-      config.countthreshold,
+      this.config.countthreshold,
     );
     words = filteredWords;
     this.logger.info(
-      `已刪除 ${deletedCount}項詞頻低於${config.countthreshold}次的術語`,
+      `已刪除 ${deletedCount}項詞頻低於${this.config.countthreshold}次的術語`,
     );
     this.logger.info(`有效詞條 共${words.length}項`);
     this.logger.info('詞頻篩選 已完成');
@@ -105,44 +118,54 @@ export class KataKanaWorker {
     //語意分析
     this.logger.info('執行 語意分析');
     let wordsPerson = this.getWordsByNerType(words, NERTYPE.PER);
-    //wait G.llm.summarize_context_batch(words_person)
+    wordsPerson = await this.contextProcessor.doTask(
+      wordsPerson,
+      TaskType.SummarizeContext,
+    );
     wordsPerson = this.removeWordsByNerType(wordsPerson, NERTYPE.EMPTY);
     words = this.replaceWordsByNerType(words, wordsPerson, NERTYPE.PER);
 
     //執行重複性校驗
     this.logger.info('執行 重複性校驗');
-    //words = G.ner.validate_words_by_duplication(words)
+    words = this.validateWordsByDuplication(words);
     words = this.removeWordsByNerType(wordsPerson, NERTYPE.EMPTY);
 
     //詞語翻譯
-    if (config.translatesurface) {
+    if (this.config.translatesurface) {
       this.logger.info('執行 詞語翻譯');
       if (language == LANGUAGE.ZH) this.logger.info('文本為中文 跳過此步驟');
       else {
-        //words = await G.llm.translate_surface_batch(words)
+        words = await this.contextProcessor.doTask(
+          words,
+          TaskType.TranslateSurface,
+        );
       }
     }
 
     //上下文翻譯
-    if (config.translatesurface) {
+    if (this.config.translatesurface) {
       this.logger.info('執行 上下文翻譯');
       if (language == LANGUAGE.ZH) this.logger.info('文本為中文 跳過此步驟');
       else {
-        for (const [k, v] of Object.entries(NERTYPE)) {
+        for (const [_, v] of Object.entries(NERTYPE)) {
           if (
-            (v === NERTYPE.PER && config.translatecontentper) ||
-            (v !== NERTYPE.PER && config.translatecontentother)
+            (v === NERTYPE.PER && this.config.translatecontentper) ||
+            (v !== NERTYPE.PER && this.config.translatecontentother)
           ) {
             this.logger.info(`執行 上下文翻譯 ${NERTYPECHINESE[v]}部分`);
             let wordType = this.getWordsByNerType(words, v);
-            //word_type = await G.llm.translate_context_batch(word_type)
+            wordType = await this.contextProcessor.doTask(
+              words,
+              TaskType.TranslateContext,
+            );
             words = this.replaceWordsByNerType(words, wordType, v);
           }
         }
       }
     }
 
-    return {} as KataKana;
+    //TODO Design Return Value
+    return this.wordsToGlossary(words);
   };
 
   async processText(content: string): Promise<[string[], string[]]> {
@@ -325,7 +348,7 @@ export class KataKanaWorker {
     const uniqueKeys = words
       .map((word) => `${word.surface}_${word.ner_type}`)
       .filter((value, index, self) => self.indexOf(value) === index); //只有文字和类型都一样才视为相同条目，避免跨类词条目合并
-
+    //置信度篩選，尚無測試數據，暫定0.8
     const threshold: { [key in LANGUAGE]: [number, number] } = {
       [LANGUAGE.ZH]: [0.8, 0.8],
       [LANGUAGE.EN]: [0.8, 0.8],
@@ -413,5 +436,79 @@ export class KataKanaWorker {
   removeWordsByCountThresHold(words: Word[], count: number): [Word[], number] {
     const filteredWords = words.filter((word) => word.count >= count);
     return [filteredWords, words.length - filteredWords.length];
+  }
+
+  validateWordsByDuplication(words: Word[]): Word[] {
+    const personWords = this.getWordsByNerType(words, NERTYPE.PER);
+
+    words.forEach((w) => {
+      if (w.ner_type == NERTYPE.PER) return;
+      if (
+        personWords.map((w) => w.surface).some((v) => w.surface.includes(v))
+      ) {
+        this.logger.info(`重複性校驗 剔除詞語 ${w.surface} - ${w.ner_type}`);
+        w.ner_type = NERTYPE.EMPTY;
+      }
+    });
+
+    return words;
+  }
+
+  lemmatizeWordsByMorphology(words: Word[]): Word[] {
+    const wordsEx: Word[] = [];
+
+    words.forEach((word) => {
+      // 以下步骤只对角色实体进行
+      if (word.ner_type !== NERTYPE.PER) return;
+
+      // 前面的步骤中已经移除了首尾的 の，如果还有，那就是 AのB 的形式，跳过
+      if (word.surface.includes('の')) return;
+
+      // 如果开头结尾都是汉字，跳过
+      if (
+        TextHelper.is_cjk(word.surface[0]) &&
+        TextHelper.is_cjk(word.surface[word.surface.length - 1])
+      )
+        return;
+
+      // 拆分词根
+      const tokens = TextHelper.extract_japanese(word.surface);
+
+      // 如果已不能再拆分，跳过
+      if (tokens.length === 1) return;
+
+      // 获取词根，获取成功则更新词语
+      const roots: string[] = [];
+      tokens.forEach((v) => {
+        if (TextHelper.is_valid_japanese_word(v, this.blacklist)) {
+          const wordEx = new Word(v, word.ner_type, word.count, word.score);
+
+          roots.push(v);
+          wordsEx.push(wordEx);
+        }
+      });
+
+      if (roots.length > 0) {
+        this.logger.info(
+          `通过词语形态还原词根 ${word.ner_type} - ${word.surface} ${roots.join(' / ')}`,
+        );
+        word.ner_type = '';
+      }
+    });
+
+    words.push(...wordsEx);
+    return words;
+  }
+
+  wordsToGlossary(words: Word[]): WGlossary {
+    const glossarys: WGlossary = {};
+    words.forEach((word) => {
+      glossarys[word.surface] = {
+        zh: word.surface_translation[0],
+        count: word.count,
+        info: word.toString(),
+      };
+    });
+    return glossarys;
   }
 }
