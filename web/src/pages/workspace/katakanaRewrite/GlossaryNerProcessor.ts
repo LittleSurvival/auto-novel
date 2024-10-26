@@ -5,13 +5,13 @@ import { LogHelper } from './helper/LogHelper';
 
 export class GlossaryNerProcessor {
   private config: GlossaryWorker;
-  private mode: string;
+  private nermode: string;
   private logger: LogHelper;
   private blacklist: string[] = [];
 
   constructor(config: GlossaryWorker, logger: LogHelper) {
     this.config = config;
-    this.mode = this.config.ner;
+    this.nermode = this.config.ner;
     this.logger = logger;
   }
 
@@ -20,7 +20,8 @@ export class GlossaryNerProcessor {
   }
 
   async generateWord(content: string): Promise<Word[]> {
-    if (this.mode == 'traditional') {
+    console.log(this.nermode);
+    if (this.nermode == 'traditional') {
       await this.generateGlossaryTraditional(content);
     }
     return [];
@@ -31,6 +32,8 @@ export class GlossaryNerProcessor {
     const matches = content.matchAll(regexp);
     const wordMap: Map<string, number> = new Map();
     const words: Word[] = [];
+
+    console.log(matches);
 
     for (const match of matches) {
       const w = match[0];

@@ -41,6 +41,10 @@ interface LoadedVolume {
   glossary: WGlossary;
 }
 
+watch(glossaryWorkspace.value, () => {
+  console.log(glossaryWorkspace.value.mode);
+});
+
 const loadGlossary = async () => {
   const logger = new LogHelper();
 
@@ -48,17 +52,23 @@ const loadGlossary = async () => {
     logger.error('沒有載入的小說 結束');
   }
 
-  const generator = new GlossaryGenerator(
-    selectedGlossaryWorker.value,
-    logger,
-    [],
-  );
-  const glossary =
-    glossaryWorkspace.value.mode == 'traditional'
-      ? await generator.loadKataKanas(loadedVolumes.value[0].content)
-      : await generator.loadGlossary(loadedVolumes.value[0].content);
+  try {
+    const generator = new GlossaryGenerator(
+      selectedGlossaryWorker.value,
+      logger,
+      [],
+    );
+    const glossary =
+      glossaryWorkspace.value.mode == 'traditional'
+        ? await generator.loadKataKanas(loadedVolumes.value[0].content)
+        : await generator.loadGlossary(loadedVolumes.value[0].content);
 
-  wGlossaryRef.value = glossary;
+    console.log(glossary);
+
+    wGlossaryRef.value = glossary;
+  } catch (ex) {
+    console.log(ex);
+  }
 };
 
 const loadVolume = async (
@@ -255,18 +265,20 @@ const showListModal = ref(false);
             <c-button
               label="传统模式"
               :round="false"
-              :type="katakanaMode === 'traditional' ? 'primary' : 'default'"
-              @action="katakanaMode = 'traditional'"
+              :type="
+                glossaryWorkspace.mode === 'traditional' ? 'primary' : 'default'
+              "
+              @action="glossaryWorkspace.mode = 'traditional'"
             />
             <c-button
               label="AI模式"
               :round="false"
-              :type="katakanaMode === 'ai' ? 'primary' : 'default'"
-              @action="katakanaMode = 'ai'"
+              :type="glossaryWorkspace.mode === 'ai' ? 'primary' : 'default'"
+              @action="glossaryWorkspace.mode = 'ai'"
             />
           </n-button-group>
         </n-flex>
-        <template v-if="katakanaMode === 'traditional'">
+        <template v-if="glossaryWorkspace.mode === 'traditional'">
           <n-card shadow="hover" bordered style="padding: auto">
             <n-flex vertical spacing="12">
               <n-button-group size="small" style="margin-bottom: 12px">
@@ -296,14 +308,14 @@ const showListModal = ref(false);
                 label="提取术语表"
                 size="small"
                 :round="false"
-                @action=""
+                @action="loadGlossary"
                 type="success"
               />
             </n-flex>
           </n-card>
         </template>
 
-        <template v-else-if="katakanaMode === 'ai'">
+        <template v-else-if="glossaryWorkspace.mode === 'ai'">
           <n-card shadow="hover">
             <n-flex vertical spacing="2">
               <n-radio-group v-model="glossaryWorkspace.mode" size="small">
@@ -371,11 +383,14 @@ const showListModal = ref(false);
 
     <n-divider />
 
-    <div v-if="Object.keys(wGlossaryRef.value).length > 0">
+    <div v-if="Object.keys(wGlossaryRef).length > 0">
       <n-scrollbar trigger="none" class="max-h-[60vh] max-w-[500px] mt-8">
-        <!-- <n-table striped size="small" class="text-xs">
+        <n-table striped size="small" class="text-xs">
           <tbody>
-            <tr v-for="[jp, { zh, info, count }] in Object.entries(wGlossaryRef)" :key="jp">
+            <tr
+              v-for="[jp, { zh, info, count }] in Object.entries(wGlossaryRef)"
+              :key="jp"
+            >
               <td>
                 <n-button
                   text
@@ -402,7 +417,7 @@ const showListModal = ref(false);
               />
             </tr>
           </tbody>
-        </n-table> -->
+        </n-table>
       </n-scrollbar>
     </div>
 

@@ -1,6 +1,5 @@
-<script lang="ts" setup>
+<!-- <script lang="ts" setup>
 import { downloadFile } from '@/util';
-import { EpubTool } from '@/util/file/epubfix';
 import { DriveFolderUploadOutlined } from '@vicons/material';
 import { UploadCustomRequestOptions } from 'naive-ui';
 import { onUpdated, ref } from 'vue';
@@ -203,4 +202,4 @@ const scrollToBottom = () => {
       </n-flex>
     </n-flex>
   </div>
-</template>
+</template> -->

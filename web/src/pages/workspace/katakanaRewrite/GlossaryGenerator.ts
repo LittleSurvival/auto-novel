@@ -41,7 +41,7 @@ export class GlossaryGenerator {
   }
 
   loadKataKanas = async (content: string): Promise<WGlossary> => {
-    const words = await this.nerProcessor.generateWord(content);
+    const words = await this.nerProcessor.generateGlossaryTraditional(content);
     return this.wordsToGlossary(words);
   };
 

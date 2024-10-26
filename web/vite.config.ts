@@ -5,6 +5,8 @@ import Components from 'unplugin-vue-components/vite';
 import { ProxyOptions, defineConfig, loadEnv } from 'vite';
 import { createHtmlPlugin } from 'vite-plugin-html';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import wasm from 'vite-plugin-wasm';
+import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig(({ command, mode }) => {
   const proxy: Record<string, ProxyOptions> = {};
@@ -62,6 +64,8 @@ export default defineConfig(({ command, mode }) => {
     },
     plugins: [
       vue(),
+      wasm(),
+      topLevelAwait(),
       createHtmlPlugin({
         minify: {
           minifyJS: true,

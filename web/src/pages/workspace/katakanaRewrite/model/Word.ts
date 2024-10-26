@@ -1,5 +1,5 @@
-import { get_encoding } from 'tiktoken';
 import { LogHelper } from '../../katakanaRewrite/helper/LogHelper';
+import { get_encoding } from 'tiktoken';
 
 export class Word {
   score: number;
