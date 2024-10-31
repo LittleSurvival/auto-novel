@@ -627,7 +627,7 @@ const radioButtonStyle = (isActive: boolean) => ({
               <td class="min-w-[40px]">{{ jp }}</td>
               <span
                 class="min-w-[20px]"
-                @click="showGlossaryInfo(jp, info ?? '無信息')"
+                @click="showGlossaryInfo(jp, info!!)"
                 >{{ '[詳細]' }}</span
               >
               <td class="whitespace-nowrap">=></td>

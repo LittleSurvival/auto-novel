@@ -172,7 +172,7 @@ export class GlossaryGenerator {
             this.logger.info(`執行 上下文翻譯 ${NERTYPECHINESE[v]}部分`);
             let wordType = this.getWordsByNerType(words, v);
             wordType = await this.contextProcessor.doTask(
-              words,
+              wordType,
               TaskType.TranslateContext,
             );
             words = this.replaceWordsByNerType(words, wordType, v);

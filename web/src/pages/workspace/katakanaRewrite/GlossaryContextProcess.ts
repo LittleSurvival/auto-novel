@@ -175,11 +175,12 @@ export class GlosssaryContextProcessor {
     );
     await this.processTasksWithLimit(
       wordsThisRound,
-      async (word, index) => {
+      async (word, _) => {
         try {
           const result = await this.TaskFunctions[taskType](word, retry);
+          let completed = 0;
           if (result != undefined) {
-            this.logger.updateProgress(index + 1, wordsThisRound.length);
+            this.logger.updateProgress(++completed, wordsThisRound.length);
             wordsSuccessed.push(result);
           }
         } catch (error) {
