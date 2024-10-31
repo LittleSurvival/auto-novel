@@ -1,5 +1,4 @@
 import { LogHelper } from '../../katakanaRewrite/helper/LogHelper';
-import { get_encoding } from 'tiktoken';
 
 export class Word {
   score: number;
@@ -42,30 +41,29 @@ export class Word {
     this.llmresponse_summarize_context = '';
     this.llmresponse_translate_context = '';
     this.llmresponse_translate_surface = '';
-
-    this.tiktoken_encoding = get_encoding('cl100k_base');
   }
 
   toString(): string {
-    return (
-      `Word(score=${this.score},` +
-      `count=${this.count},` +
-      `context=${JSON.stringify(this.context)},` +
-      `context_summary=${this.context_summary},` +
-      `context_translation=${JSON.stringify(this.context_translation)},` +
-      `surface=${this.surface},` +
-      `surface_romaji=${this.surface_romaji},` +
-      `surface_translation=${this.surface_translation},` +
-      `surface_translation_description=${this.surface_translation_description},` +
-      `ner_type=${this.ner_type},` +
-      `attribute=${this.attribute},` +
-      `llmresponse_summarize_context=${this.llmresponse_summarize_context},` +
-      `llmresponse_translate_context=${this.llmresponse_translate_context},` +
-      `llmresponse_translate_surface=${this.llmresponse_translate_surface})`
-    );
+    return `
+      score=${this.score}
+      count=${this.count}
+      context=${JSON.stringify(this.context)}
+      context_summary=${this.context_summary}
+      context_translation=${JSON.stringify(this.context_translation)}
+      surface=${this.surface}
+      surface_romaji=${this.surface_romaji}
+      surface_translation=${this.surface_translation}
+      surface_translation_description=${this.surface_translation_description}
+      ner_type=${this.ner_type}
+      attribute=${this.attribute}
+      llmresponse_summarize_context=${this.llmresponse_summarize_context}
+      llmresponse_translate_context=${this.llmresponse_translate_context}
+      llmresponse_translate_surface=${this.llmresponse_translate_surface}
+      `;
   }
 
-  searchContext(original: string[], words: Word[]): string[] {
+  async searchContext(original: string[], words: Word[]): Promise<string[]> {
+    const { encode } = await import('gpt-tokenizer');
     // 1. 从 words 中找出 self.surface 的母串
     const replacements = new Set<string>(
       words
@@ -95,8 +93,7 @@ export class Word {
       // 在替换后的 line 中匹配 self.surface
       if (line.includes(this.surface)) {
         if (!(line in Word.MATCH_LENGTHS_CACHE)) {
-          Word.MATCH_LENGTHS_CACHE[line] =
-            this.tiktoken_encoding.encode(line).length;
+          Word.MATCH_LENGTHS_CACHE[line] = encode(line).length;
         }
         match_lengths[line] = Word.MATCH_LENGTHS_CACHE[line];
       }
@@ -139,7 +136,9 @@ export class Word {
     return context;
   }
 
-  clipContext(threshold: number, logger: LogHelper): string[] {
+  async clipContext(threshold: number, logger: LogHelper): Promise<string[]> {
+    const { encode } = await import('gpt-tokenizer');
+
     if (!this.context || this.context.length === 0) {
       logger.debug(
         `${this.surface} - ${this.ner_type} - ${this.count} - ${this.context} ...`,
@@ -151,7 +150,7 @@ export class Word {
     let contextLength = 0;
 
     for (const line of this.context) {
-      const lineLength = this.tiktoken_encoding.encode(line).length;
+      const lineLength = encode(line).length;
 
       if (lineLength > threshold) {
         continue;
@@ -166,12 +165,8 @@ export class Word {
 
     if (context.length === 0) {
       const closestLine = this.context.reduce((prevLine, currentLine) => {
-        const prevDiff = Math.abs(
-          this.tiktoken_encoding.encode(prevLine).length - threshold,
-        );
-        const currentDiff = Math.abs(
-          this.tiktoken_encoding.encode(currentLine).length - threshold,
-        );
+        const prevDiff = Math.abs(encode(prevLine).length - threshold);
+        const currentDiff = Math.abs(encode(currentLine).length - threshold);
         return currentDiff < prevDiff ? currentLine : prevLine;
       });
       context.push(closestLine);

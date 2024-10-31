@@ -1,7 +1,8 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import { DeleteOutlineOutlined, PlusOutlined } from '@vicons/material';
-import { UploadCustomRequestOptions } from 'naive-ui';
+import { UploadCustomRequestOptions, NFlex } from 'naive-ui';
+import { VueDraggable } from 'vue-draggable-plus';
 
 import { Locator } from '@/data';
 import { Translator, TranslatorConfig } from '@/domain/translate';
@@ -20,19 +21,24 @@ const glossaryWorkspace = Locator.glossaryWorkSpaceRepository().ref;
 
 const loadedVolumes = ref<LoadedVolume[]>([]);
 const wGlossaryRef = ref<WGlossary>({});
-const logger = ref<LogHelper>();
+const loggerRef = ref<LogHelper>(new LogHelper());
+
+const selectedGlossaryInfo = ref<{ surface: string; detail: string }>();
+const showGlossaryInfoModal = ref(false);
+const showGlossaryInfo = (surface: string, detail: string) => {
+  selectedGlossaryInfo.value = {
+    surface,
+    detail,
+  };
+  showGlossaryInfoModal.value = true;
+};
 
 const showSakuraSelectModal = ref(false);
 const selectedSakuraWorkerId = ref(sakuraWorkspace.value.workers[0]?.id);
 const selectedGlossaryWorker = ref(glossaryWorkspace.value.workers[0]);
 
 const katakanaTranslations = ref<{ [key: string]: string }>({});
-
-const KataKanaModeOptions = [
-  { value: 'traditional', label: '传统术语表翻译' },
-  { value: 'ai', label: 'AI智能翻译' },
-];
-const katakanaMode = ref<'traditional' | 'ai'>(glossaryWorkspace.value.mode);
+const logs = computed(() => loggerRef.value?.logs);
 
 interface LoadedVolume {
   source: 'tmp' | 'local';
@@ -41,15 +47,15 @@ interface LoadedVolume {
   glossary: WGlossary;
 }
 
-watch(glossaryWorkspace.value, () => {
-  console.log(glossaryWorkspace.value.mode);
-});
-
 const loadGlossary = async () => {
   const logger = new LogHelper();
 
-  if (loadedVolumes.value.length <= 0) {
-    logger.error('沒有載入的小說 結束');
+  loggerRef.value = logger;
+
+  if (loadedVolumes.value.length == 0) {
+    logger.error('沒有載入的小說');
+    logger.error('結束');
+    return;
   }
 
   try {
@@ -60,14 +66,15 @@ const loadGlossary = async () => {
     );
     const glossary =
       glossaryWorkspace.value.mode == 'traditional'
-        ? await generator.loadKataKanas(loadedVolumes.value[0].content)
+        ? await generator.loadKataKanas(
+            loadedVolumes.value[0].content,
+            glossaryWorkspace.value.traditionalthreshold,
+          )
         : await generator.loadGlossary(loadedVolumes.value[0].content);
-
-    console.log(glossary);
 
     wGlossaryRef.value = glossary;
   } catch (ex) {
-    console.log(ex);
+    logger.error(ex as string);
   }
 };
 
@@ -124,9 +131,6 @@ const customRequest = ({
       onError();
     });
 };
-
-const katakanaThredhold = ref(10);
-const logs = computed(() => logger.value?.getLogs());
 
 const katakanaDeleted = ref<string[]>([]);
 const undoDeleteKatakana = () => {
@@ -187,6 +191,22 @@ const translateKatakanas = async (id: 'baidu' | 'youdao' | 'sakura') => {
 };
 
 const showListModal = ref(false);
+const dropdownStates = ref<{ [key: number]: boolean }>({});
+
+const toggleDropdown = (index: number) => {
+  dropdownStates.value[index] = !dropdownStates.value[index];
+};
+const selectWorker = (index: number) => {
+  glossaryWorkspace.value.currentworker = index;
+};
+
+const radioButtonStyle = (isActive: boolean) => ({
+  flex: 1,
+  textAlign: 'center',
+  fontSize: '12px',
+  backgroundColor: isActive ? '#008000' : '#000',
+  color: '#fff',
+});
 </script>
 
 <template>
@@ -246,18 +266,6 @@ const showListModal = ref(false);
       </n-flex>
     </c-action-wrapper>
 
-    <c-action-wrapper title="次数下限" style="margin-bottom: 20px">
-      <n-flex align="center">
-        <n-input-number
-          v-model:value="katakanaThredhold"
-          clearable
-          size="small"
-          style="width: 16em"
-          min="1"
-        />
-      </n-flex>
-    </c-action-wrapper>
-
     <c-action-wrapper title="提取器">
       <n-flex vertical spacing="2" style="margin-left: 12px">
         <n-flex align="center">
@@ -278,9 +286,10 @@ const showListModal = ref(false);
             />
           </n-button-group>
         </n-flex>
+
         <template v-if="glossaryWorkspace.mode === 'traditional'">
           <n-card shadow="hover" bordered style="padding: auto">
-            <n-flex vertical spacing="12">
+            <n-flex vertical>
               <n-button-group size="small" style="margin-bottom: 12px">
                 <c-button
                   label="百度翻译"
@@ -304,6 +313,18 @@ const showListModal = ref(false);
                 />
               </n-button-group>
 
+              <c-action-wrapper title="次数下限" style="margin-bottom: 20px">
+                <n-flex align="center">
+                  <n-input-number
+                    v-model:value="glossaryWorkspace.traditionalthreshold"
+                    clearable
+                    size="small"
+                    style="width: 16em"
+                    min="1"
+                  />
+                </n-flex>
+              </c-action-wrapper>
+
               <c-button
                 label="提取术语表"
                 size="small"
@@ -316,36 +337,235 @@ const showListModal = ref(false);
         </template>
 
         <template v-else-if="glossaryWorkspace.mode === 'ai'">
-          <n-card shadow="hover">
-            <n-flex vertical spacing="2">
-              <n-radio-group v-model="glossaryWorkspace.mode" size="small">
-                <n-radio label="OpenAI" value="openai" />
-                <n-radio label="本地" value="local" />
-              </n-radio-group>
-              <c-button
-                label="提取术语表"
-                size="small"
-                :round="false"
-                type="success"
-                @action="loadGlossary"
-              />
-              <template v-if="logs && logs.length > 0">
-                <n-h2>日志</n-h2>
+          <!-- Worker Item -->
+          <n-list>
+            <vue-draggable
+              v-model="glossaryWorkspace.workers"
+              :animation="150"
+              handle=".drag-trigger"
+            >
+              <n-list-item
+                v-for="(worker, index) of glossaryWorkspace.workers"
+                :key="index"
+                :style="{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  backgroundColor: '#222',
+                  marginBottom: '10px',
+                  borderRadius: '5px',
+                  color: '#fff',
+                  width: '100%',
+                }"
+              >
+                <!-- Worker Header -->
                 <div
-                  style="max-height: 300px; overflow-y: auto"
-                  ref="logContainerRef"
+                  :style="{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px',
+                    borderRadius: '5px',
+                  }"
                 >
+                  <!-- Drag Handle -->
                   <div
-                    v-for="log in logs"
-                    :key="log.id"
-                    :class="`log-${log.type}`"
+                    class="drag-trigger"
+                    :style="{ cursor: 'move', marginRight: '20px' }"
                   >
-                    <n-p>{{ log.message }}</n-p>
+                    <n-icon> </n-icon>
                   </div>
+
+                  <!-- Select Button -->
+                  <n-button
+                    @click="selectWorker(index)"
+                    :round="true"
+                    :style="{
+                      backgroundColor:
+                        glossaryWorkspace.currentworker === index
+                          ? '#008000'
+                          : '#000',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }"
+                  >
+                    {{
+                      glossaryWorkspace.currentworker === index
+                        ? '已選擇'
+                        : '選擇'
+                    }}
+                  </n-button>
+
+                  <!-- Worker Label -->
+                  <div
+                    :style="{
+                      marginLeft: '10px',
+                      fontSize: '12px',
+                      flexGrow: 1,
+                    }"
+                  >
+                    {{ `[${worker.apikey}]@${worker.baseurl}` }}
+                  </div>
+
+                  <!-- Dropdown Toggle Button -->
+                  <n-button
+                    @click="toggleDropdown(index)"
+                    :round="true"
+                    :style="{
+                      backgroundColor: '#000',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }"
+                  >
+                    {{ dropdownStates[index] ? '收起' : '设置' }}
+                  </n-button>
                 </div>
-              </template>
-            </n-flex>
-          </n-card>
+
+                <!-- Dropdown Content with Transition -->
+                <n-collapse-transition>
+                  <div
+                    v-if="dropdownStates[index]"
+                    :style="{
+                      padding: '10px',
+                      backgroundColor: '#000',
+                      borderRadius: '5px',
+                    }"
+                  >
+                    <!-- Worker Settings Form -->
+                    <n-form
+                      :model="worker"
+                      label-width="auto"
+                      :label-style="{ color: '#fff', fontSize: '8px' }"
+                      :style="{ color: '#fff', fontSize: '12px' }"
+                    >
+                      <!-- Type -->
+                      <c-action-wrapper title="術語表提取模式">
+                        <n-radio-group
+                          v-model:value="worker.type"
+                          size="small"
+                          :style="{ display: 'flex' }"
+                        >
+                          <n-radio-button
+                            value="local"
+                            :style="radioButtonStyle(worker.type === 'local')"
+                          >
+                            local
+                          </n-radio-button>
+                          <n-radio-button
+                            value="api"
+                            :style="radioButtonStyle(worker.type === 'api')"
+                          >
+                            api
+                          </n-radio-button>
+                        </n-radio-group>
+                      </c-action-wrapper>
+
+                      <!-- NER -->
+                      <c-action-wrapper title="實體辨識">
+                        <n-radio-group
+                          v-model:value="worker.ner"
+                          size="small"
+                          :style="{ display: 'flex' }"
+                        >
+                          <n-radio-button
+                            value="local"
+                            :style="radioButtonStyle(worker.ner === 'local')"
+                          >
+                            Local
+                          </n-radio-button>
+                          <n-radio-button
+                            value="traditional"
+                            :style="
+                              radioButtonStyle(worker.ner === 'traditional')
+                            "
+                          >
+                            Traditional
+                          </n-radio-button>
+                          <n-radio-button
+                            value="api"
+                            :style="radioButtonStyle(worker.ner === 'api')"
+                          >
+                            API
+                          </n-radio-button>
+                        </n-radio-group>
+                      </c-action-wrapper>
+
+                      <!-- Conditionally Visible Fields -->
+                      <template v-if="worker.type !== 'local'">
+                        <!-- API Key -->
+                        <n-form-item-row label="">
+                          API Key
+                          <n-input v-model:value="worker.apikey" />
+                        </n-form-item-row>
+                        <n-form-item label="Model Name">
+                          <n-input v-model:value="worker.modelname"></n-input>
+                        </n-form-item>
+                        <!-- Model Name -->
+                      </template>
+                      <!-- Base URL -->
+                      <n-form-item-row label="Base URL">
+                        <n-input v-model:value="worker.baseurl" />
+                      </n-form-item-row>
+                      <!-- Other Settings -->
+                      <!-- Count Threshold -->
+                      <n-form-item-row label="Count Threshold">
+                        <n-input-number v-model:value="worker.countthreshold" />
+                      </n-form-item-row>
+
+                      <!-- Timeout -->
+                      <n-form-item-row label="Timeout">
+                        <n-input-number v-model:value="worker.timeout" />
+                      </n-form-item-row>
+
+                      <!-- Request Frequency -->
+                      <n-form-item-row label="Request Frequency">
+                        <n-input-number
+                          v-model:value="worker.requestfrequency"
+                        />
+                      </n-form-item-row>
+
+                      <!-- Translate Surface -->
+                      <n-form-item-row label="Translate Surface">
+                        <n-checkbox v-model:checked="worker.translatesurface" />
+                      </n-form-item-row>
+
+                      <!-- Translate Content Per -->
+                      <n-form-item-row label="Translate Content Per">
+                        <n-checkbox
+                          v-model:checked="worker.translatecontentper"
+                        />
+                      </n-form-item-row>
+
+                      <!-- Translate Content Other -->
+                      <n-form-item-row label="Translate Content Other">
+                        <n-checkbox
+                          v-model:checked="worker.translatecontentother"
+                        />
+                      </n-form-item-row>
+                    </n-form>
+                  </div>
+                </n-collapse-transition>
+              </n-list-item>
+            </vue-draggable>
+          </n-list>
+          <c-button
+            label="提取术语表"
+            size="small"
+            :round="false"
+            type="success"
+            @action="loadGlossary"
+          />
+        </template>
+
+        <template v-if="logs && logs.length >= 0">
+          <n-h2 style="margin-bottom: 0">日志</n-h2>
+          <div
+            style="max-height: 300px; overflow-y: auto"
+            ref="logContainerRef"
+          >
+            <div v-for="log in logs" :key="log.id" :class="`log-${log.type}`">
+              <n-p>{{ log.message }}</n-p>
+            </div>
+          </div>
         </template>
       </n-flex>
     </c-action-wrapper>
@@ -404,7 +624,12 @@ const showListModal = ref(false);
                 </n-button>
               </td>
               <td class="whitespace-nowrap">{{ count }}</td>
-              <td class="min-w-[100px]">{{ zh }}</td>
+              <td class="min-w-[40px]">{{ jp }}</td>
+              <span
+                class="min-w-[20px]"
+                @click="showGlossaryInfo(jp, info ?? '無信息')"
+                >{{ '[詳細]' }}</span
+              >
               <td class="whitespace-nowrap">=></td>
               <n-input
                 v-model:value="wGlossaryRef[jp].zh"
@@ -420,6 +645,15 @@ const showListModal = ref(false);
         </n-table>
       </n-scrollbar>
     </div>
+
+    <c-modal
+      :title="`術語详情 - ${selectedGlossaryInfo?.surface}`"
+      v-model:show="showGlossaryInfoModal"
+    >
+      <n-p style="white-space: pre-wrap">
+        {{ selectedGlossaryInfo?.detail }}
+      </n-p>
+    </c-modal>
 
     <template #sidebar>
       <local-volume-list-katakana @volume-loaded="loadLocalFile" />

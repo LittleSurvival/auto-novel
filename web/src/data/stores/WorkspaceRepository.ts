@@ -160,10 +160,11 @@ export const createSakuraWorkspaceRepository = () =>
   );
 
 export const createGlossaryWorkSpaceRepository = (
-  migrate?: (ref: GlossaryConfig) => void,
+  migrate?: (ref: Ref<GlossaryConfig>) => void,
 ) => {
   const ref = useLocalStorage<GlossaryConfig>('glossary-workspace', {
     mode: 'traditional',
+    traditionalthreshold: 10,
     currentworker: 0,
     workers: [
       {
@@ -197,7 +198,7 @@ export const createGlossaryWorkSpaceRepository = (
   });
 
   if (migrate) {
-    migrate(ref.value);
+    migrate(ref);
   }
 
   const addHistory = (volume: VolumeHistory) => {

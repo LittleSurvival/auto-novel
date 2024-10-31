@@ -1,6 +1,7 @@
 import { translate } from '../domain/translate/Translate';
 export interface GlossaryConfig {
   mode: 'traditional' | 'ai';
+  traditionalthreshold: number;
   currentworker: number;
   workers: GlossaryWorker[];
   history: VolumeHistory[];

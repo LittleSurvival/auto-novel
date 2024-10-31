@@ -111,21 +111,26 @@ export class GlosssaryContextProcessor {
     retry: boolean = false,
   ): Promise<Response> {
     try {
-      const completion = await this.api.createChatCompletions({
-        model: this.config.modelname,
-        messages: [
-          {
-            role: 'user',
-            content: content,
-          },
-        ],
-        temperature: this.TranslateIndex[taskType].TEMPERATURE,
-        top_p: this.TranslateIndex[taskType].TOP_P,
-        max_tokens: this.TranslateIndex[taskType].MAX_TOKENS,
-        frequency_penalty: retry
-          ? this.TranslateIndex[taskType].FREQUENCY_PENALTY + 0.2
-          : this.TranslateIndex[taskType].FREQUENCY_PENALTY,
-      });
+      const completion = await this.api.createChatCompletions(
+        {
+          model: this.config.modelname,
+          messages: [
+            {
+              role: 'user',
+              content: content,
+            },
+          ],
+          temperature: this.TranslateIndex[taskType].TEMPERATURE,
+          top_p: this.TranslateIndex[taskType].TOP_P,
+          max_tokens: this.TranslateIndex[taskType].MAX_TOKENS,
+          frequency_penalty: retry
+            ? this.TranslateIndex[taskType].FREQUENCY_PENALTY + 0.2
+            : this.TranslateIndex[taskType].FREQUENCY_PENALTY,
+        },
+        {
+          timeout: false,
+        },
+      );
       return {
         message: completion.choices[0].message.content!!,
         usage: completion.usage,
@@ -168,20 +173,21 @@ export class GlosssaryContextProcessor {
       `${this.TaskTypeInfo[taskType]}`,
       wordsThisRound.length,
     );
-    wordsThisRound.forEach((word, index) => {
-      const task = this.TaskFunctions[taskType](word, retry)
-        .then((result) => {
+    await this.processTasksWithLimit(
+      wordsThisRound,
+      async (word, index) => {
+        try {
+          const result = await this.TaskFunctions[taskType](word, retry);
           if (result != undefined) {
             this.logger.updateProgress(index + 1, wordsThisRound.length);
             wordsSuccessed.push(result);
           }
-        })
-        .catch((error) => {
+        } catch (error) {
           this.logger.error(`處理詞語時錯誤 : ${word.surface} - ${error}`);
-        });
-
-      tasks.push(task);
-    });
+        }
+      },
+      this.config.requestfrequency,
+    );
 
     //等待非同步任務完成
     await Promise.allSettled(tasks);
@@ -259,7 +265,7 @@ export class GlosssaryContextProcessor {
         response.usage.completion_tokens >=
         this.TranslateIndex[TaskType.TranslateSurface].MAX_TOKENS
       ) {
-        this.logger.warning('子任务执行失败，稍后将重试 ...');
+        this.logger.warning('Token過載，子任务执行失败，稍后将重试 ...');
         return;
       }
 
@@ -275,7 +281,7 @@ export class GlosssaryContextProcessor {
 
       return word;
     } catch (ex) {
-      this.logger.warning('子任务执行失败，稍后将重试 ...');
+      this.logger.warning(`子任务执行失败，稍后将重试 ... ${ex}`);
     }
   }
 
@@ -298,7 +304,7 @@ export class GlosssaryContextProcessor {
         completion.usage.completion_tokens >=
         this.TranslateIndex[TaskType.TranslateContext].MAX_TOKENS
       ) {
-        this.logger.warning('子任务执行失败，稍后将重试 ...');
+        this.logger.warning('Token過載，子任务执行失败，稍后将重试 ...');
         return undefined;
       }
 
@@ -311,6 +317,8 @@ export class GlosssaryContextProcessor {
 
       word.context_translation = contextTranslation;
       word.llmresponse_summarize_context = completion.responseRaw;
+
+      return word;
     } catch (ex) {
       this.logger.warning('上下文翻譯 子任務執行失敗，稍後將重試');
       return undefined;
@@ -335,7 +343,7 @@ export class GlosssaryContextProcessor {
         completion.usage.completion_tokens >=
         this.TranslateIndex[TaskType.SummarizeContext].MAX_TOKENS
       ) {
-        this.logger.warning('子任务执行失败，稍后将重试 ...');
+        this.logger.warning('Token過載，子任务执行失败，稍后将重试 ...');
         return undefined;
       }
 
@@ -357,9 +365,33 @@ export class GlosssaryContextProcessor {
       word.attribute = result.sex;
       word.context_summary = result;
       word.llmresponse_summarize_context = completion.responseRaw;
+
+      return word;
     } catch (ex) {
-      this.logger.warning('子任务执行失败，稍后将重试 ...');
+      this.logger.warning(`子任务执行失败，稍后将重试 ... ${ex as string}`);
       return undefined;
     }
+  }
+
+  async processTasksWithLimit<T>(
+    items: T[],
+    worker: (item: T, index: number) => Promise<void>,
+    concurrency: number,
+  ): Promise<void> {
+    let currentIndex = 0;
+
+    const execute = async () => {
+      while (currentIndex < items.length) {
+        const index = currentIndex++;
+        await worker(items[index], index);
+      }
+    };
+
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < concurrency; i++) {
+      workers.push(execute());
+    }
+
+    await Promise.all(workers);
   }
 }

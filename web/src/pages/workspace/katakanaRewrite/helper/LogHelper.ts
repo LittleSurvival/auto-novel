@@ -3,16 +3,34 @@ import { ref } from 'vue';
 interface LogEntry {
   id: number;
   type: 'debug' | 'info' | 'warning' | 'error' | 'critical' | 'progress';
+  rawmessage: string;
   message: string;
 }
 
 export class LogHelper {
-  private logId = 0;
+  private logId = ref(0);
   public logs = ref<LogEntry[]>([]);
+  private repeat = ref(1);
   private progressLogId: number | null = null;
 
   addLog(type: LogEntry['type'], message: string) {
-    this.logs.value.push({ id: this.logId++, type, message });
+    const lastlog = this.logs.value[this.logs.value.length - 1];
+
+    if (lastlog != undefined) {
+      if (message == lastlog.rawmessage) {
+        lastlog.message = `${message} [x${++this.repeat.value}]`;
+        this.logs.value = [...this.logs.value];
+        return;
+      }
+    }
+
+    this.logs.value.push({
+      id: this.logId.value++,
+      type,
+      rawmessage: message,
+      message: `[${type.toUpperCase()}]${message}`,
+    });
+    this.repeat.value = 1;
   }
 
   debug(message: string) {
@@ -52,11 +70,12 @@ export class LogHelper {
       this.finishProgress();
     }
 
-    const message = `#${text} [0/${total}]`;
+    const message = `[PROGRESS]${text} [0/${total}]`;
     const progressEntry: LogEntry = {
-      id: this.logId++,
+      id: this.logId.value++,
       type: 'progress',
-      message,
+      rawmessage: text,
+      message: message,
     };
     this.logs.value.push(progressEntry);
     this.progressLogId = progressEntry.id;
@@ -73,7 +92,7 @@ export class LogHelper {
       (entry) => entry.id === this.progressLogId,
     );
     if (progressEntry) {
-      progressEntry.message = `#${progressEntry.message.split('[')[0].slice(1)} [${current}/${total}]`;
+      progressEntry.message = `[PROGRESS]${progressEntry.rawmessage} [${current}/${total}]`;
       // 為了確保vue當機，重新賦值logs
       this.logs.value = [...this.logs.value];
     }

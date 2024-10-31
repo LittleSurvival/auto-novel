@@ -20,20 +20,23 @@ export class GlossaryNerProcessor {
   }
 
   async generateWord(content: string): Promise<Word[]> {
-    console.log(this.nermode);
     if (this.nermode == 'traditional') {
-      await this.generateGlossaryTraditional(content);
+      return await this.generateGlossaryTraditional(
+        content,
+        this.config.countthreshold,
+      );
     }
     return [];
   }
 
-  async generateGlossaryTraditional(content: string): Promise<Word[]> {
+  async generateGlossaryTraditional(
+    content: string,
+    threshold: number,
+  ): Promise<Word[]> {
     const regexp = /[\u30A0-\u30FF]{2,}/g;
     const matches = content.matchAll(regexp);
     const wordMap: Map<string, number> = new Map();
     const words: Word[] = [];
-
-    console.log(matches);
 
     for (const match of matches) {
       const w = match[0];
@@ -41,7 +44,7 @@ export class GlossaryNerProcessor {
     }
 
     wordMap.forEach((count, surface) => {
-      if (count < this.config.countthreshold) return;
+      if (count < threshold) return;
       //片假名NER無法做置信度過濾，無條件通過
       const word = new Word(surface, NERTYPE.UNKNOWN, count, 0.9);
 

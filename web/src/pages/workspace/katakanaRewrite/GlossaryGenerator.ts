@@ -40,8 +40,15 @@ export class GlossaryGenerator {
     this.nerProcessor.loadBlackList(this.blacklist);
   }
 
-  loadKataKanas = async (content: string): Promise<WGlossary> => {
-    const words = await this.nerProcessor.generateGlossaryTraditional(content);
+  loadKataKanas = async (
+    content: string,
+    threshold: number,
+  ): Promise<WGlossary> => {
+    this.logger.info('執行 查找片假名');
+    const words = await this.nerProcessor.generateGlossaryTraditional(
+      content,
+      threshold,
+    );
     return this.wordsToGlossary(words);
   };
 
@@ -66,10 +73,9 @@ export class GlossaryGenerator {
     }
 
     this.logger.info('查找名詞實體');
-    this.nerProcessor.generateWord(content);
+    words = await this.nerProcessor.generateWord(contentLines.join('\n'));
 
     //Debug mode for threshold(Deleted)
-
     this.logger.info('消去重複字和計算詞彙出現次數');
     if (this.config.ner != 'traditional') {
       words = await this.mergeAndCount(words, contentLines, language);
@@ -77,10 +83,14 @@ export class GlossaryGenerator {
 
     this.logger.info('執行查找上下文');
     this.logger.startProgress('查找上下文', words.length);
-    await words.forEach((word, index, words) => {
-      word.context = word.searchContext(contentLines, words);
-      this.logger.updateProgress(index + 1, words.length);
-    });
+
+    let completed = 0;
+    await Promise.all(
+      words.map(async (word) => {
+        word.context = await word.searchContext(contentLines, words);
+        this.logger.updateProgress(++completed, words.length);
+      }),
+    );
 
     this.logger.finishProgress();
 
@@ -93,10 +103,13 @@ export class GlossaryGenerator {
       this.logger.info('還原詞根 已完成');
 
       this.logger.startProgress('更新上下文', words.length);
-      words.forEach((word, index) => {
-        word.context = word.searchContext(contentLines, words);
-        this.logger.updateProgress(index + 1, words.length);
-      });
+      let completed = 0;
+      await Promise.all(
+        words.map(async (word) => {
+          word.context = await word.searchContext(contentLines, words);
+          this.logger.updateProgress(++completed, words.length);
+        }),
+      );
       this.logger.finishProgress();
     }
 
@@ -108,6 +121,7 @@ export class GlossaryGenerator {
       words,
       this.config.countthreshold,
     );
+
     words = filteredWords;
     this.logger.info(
       `已刪除 ${deletedCount}項詞頻低於${this.config.countthreshold}次的術語`,
@@ -128,13 +142,16 @@ export class GlossaryGenerator {
     //執行重複性校驗
     this.logger.info('執行 重複性校驗');
     words = this.validateWordsByDuplication(words);
-    words = this.removeWordsByNerType(wordsPerson, NERTYPE.EMPTY);
+    words = this.removeWordsByNerType(words, NERTYPE.EMPTY);
+
+    console.log(words);
 
     //詞語翻譯
     if (this.config.translatesurface) {
       this.logger.info('執行 詞語翻譯');
-      if (language == LANGUAGE.ZH) this.logger.info('文本為中文 跳過此步驟');
-      else {
+      if (language == LANGUAGE.ZH) {
+        this.logger.info('文本為中文 跳過此步驟');
+      } else {
         words = await this.contextProcessor.doTask(
           words,
           TaskType.TranslateSurface,
@@ -164,7 +181,6 @@ export class GlossaryGenerator {
       }
     }
 
-    //TODO Design Return Value
     return this.wordsToGlossary(words);
   };
 
@@ -348,7 +364,7 @@ export class GlossaryGenerator {
     const uniqueKeys = words
       .map((word) => `${word.surface}_${word.ner_type}`)
       .filter((value, index, self) => self.indexOf(value) === index); //只有文字和类型都一样才视为相同条目，避免跨类词条目合并
-    //置信度篩選，尚無測試數據，暫定0.8
+    //置信度篩選，尚無參考和準確測試數據，暫定0.8
     const threshold: { [key in LANGUAGE]: [number, number] } = {
       [LANGUAGE.ZH]: [0.8, 0.8],
       [LANGUAGE.EN]: [0.8, 0.8],
