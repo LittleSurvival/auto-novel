@@ -166,6 +166,7 @@ export class GlosssaryContextProcessor {
   }> {
     const retry = wordsFailed.length > 0;
     const wordsThisRound = retry ? wordsFailed : words;
+    let completed = 0;
 
     const tasks: Promise<void>[] = [];
 
@@ -178,7 +179,7 @@ export class GlosssaryContextProcessor {
       async (word, _) => {
         try {
           const result = await this.TaskFunctions[taskType](word, retry);
-          let completed = 0;
+
           if (result != undefined) {
             this.logger.updateProgress(++completed, wordsThisRound.length);
             wordsSuccessed.push(result);
@@ -275,8 +276,10 @@ export class GlosssaryContextProcessor {
       );
 
       word.surface_romaji = data.romaji !== word.surface ? data.romaji : '';
-      word.surface_translation =
-        data.translation_1 ?? '' + data.translation_2 ?? '';
+      word.surface_translation = [
+        data.translation_1 ?? '',
+        data.translation_2 ?? '',
+      ];
       word.surface_translation_description = data.description;
       word.llmresponse_translate_surface = response.responseRaw;
 

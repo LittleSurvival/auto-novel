@@ -22,3 +22,4 @@ web/vite.config.ts.timestamp*
 
 # Web extension
 web-extension/src/_metadata/
+web/pnpm-lock.yaml
