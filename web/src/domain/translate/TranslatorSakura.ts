@@ -61,7 +61,7 @@ export class SakuraTranslator implements SegmentTranslator {
     }
 
     if (this.model === undefined) {
-      this.log('无法获取模型元数据，可能需要升级llamacpp版本');
+      this.log('无法获取模型数据');
       return false;
     }
 
@@ -74,7 +74,7 @@ export class SakuraTranslator implements SegmentTranslator {
 
     for (const key in metaExpected) {
       if (metaCurrent[key] !== metaExpected[key]) {
-        this.log(`元数据检查未通过，不要尝试欺骗模型检查`);
+        this.log(`模型检查未通过，不要尝试欺骗模型检查`);
         return false;
       }
     }
@@ -153,7 +153,15 @@ export class SakuraTranslator implements SegmentTranslator {
   }
 
   private async detectModel() {
-    const modelsPage = await this.api.listModels().catch(() => undefined);
+    const modelsPage = await this.api
+      .listModels({
+        headers: {
+          'ngrok-skip-browser-warning': '69420',
+        },
+      })
+      .catch((e) => {
+        this.log(`获取模型数据失败：${e}`);
+      });
     const model = modelsPage?.data[0];
     if (model === undefined) {
       return undefined;
@@ -294,6 +302,17 @@ export namespace SakuraTranslator {
         n_embd: 5120,
         n_params: 14770033664,
         size: 8180228096,
+      },
+    },
+    'sakura-14b-qwen2.5-v1.0-q6k': {
+      repo: 'SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF',
+      meta: {
+        vocab_type: 2,
+        n_vocab: 152064,
+        n_ctx_train: 131072,
+        n_embd: 5120,
+        n_params: 14770033664,
+        size: 12118716416,
       },
     },
     'sakura-14b-qwen2beta-v0.9.2-iq4xs': {
