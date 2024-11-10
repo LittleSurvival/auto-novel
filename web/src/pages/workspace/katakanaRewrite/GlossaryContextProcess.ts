@@ -197,10 +197,10 @@ export class GlosssaryContextProcessor {
 
     //獲取失敗任務列表
     const successedWordPairs = new Set(
-      wordsSuccessed.map((word) => `${word.surface}_${word.ner_type}`),
+      wordsSuccessed.map((word) => `${word.surface}_${word.nerType}`),
     );
     const updatedWordsFailed = words.filter(
-      (word) => !successedWordPairs.has(`${word.surface}_${word.ner_type}`),
+      (word) => !successedWordPairs.has(`${word.surface}_${word.nerType}`),
     );
 
     return {
@@ -243,10 +243,9 @@ export class GlosssaryContextProcessor {
     word: Word,
     retry: boolean,
   ): Promise<Word | undefined> {
-    // async with self.semaphore, self.async_limiter:
     try {
       let prompt = '';
-      if (word.ner_type != NERTYPE.PER) {
+      if (word.nerType != NERTYPE.PER) {
         prompt = PromptHelper.PROMPT_TRANSLATE_SURFACE_COMMON.replace(
           '{surface}',
           word.surface,
@@ -275,13 +274,13 @@ export class GlosssaryContextProcessor {
         TextHelper.fixBrokenJsonString(response.message.trim()),
       );
 
-      word.surface_romaji = data.romaji !== word.surface ? data.romaji : '';
-      word.surface_translation = [
+      word.surfaceRomaji = data.romaji !== word.surface ? data.romaji : '';
+      word.surfaceTranslation = [
         data.translation_1 ?? '',
         data.translation_2 ?? '',
       ];
-      word.surface_translation_description = data.description;
-      word.llmresponse_translate_surface = response.responseRaw;
+      word.surfaceTranslationDescription = data.description;
+      word.llmresponseTranslateSurface = response.responseRaw;
 
       return word;
     } catch (ex) {
@@ -319,8 +318,8 @@ export class GlosssaryContextProcessor {
         .filter((line) => line.length > 0)
         .forEach((line) => contextTranslation.push(line));
 
-      word.context_translation = contextTranslation;
-      word.llmresponse_summarize_context = completion.responseRaw;
+      word.contextTranslation = contextTranslation;
+      word.llmresponseSummarizeContext = completion.responseRaw;
 
       return word;
     } catch (ex) {
@@ -356,7 +355,7 @@ export class GlosssaryContextProcessor {
       );
 
       if (result['is_name'].includes('否')) {
-        word.ner_type = NERTYPE.EMPTY;
+        word.nerType = NERTYPE.EMPTY;
         this.logger.info(
           `[语义分析] 已剔除 - ${word.surface} - ${JSON.stringify(result)}`,
         );
@@ -367,8 +366,8 @@ export class GlosssaryContextProcessor {
       }
 
       word.attribute = result.sex;
-      word.context_summary = result;
-      word.llmresponse_summarize_context = completion.responseRaw;
+      word.contextSummary = result;
+      word.llmresponseSummarizeContext = completion.responseRaw;
 
       return word;
     } catch (ex) {

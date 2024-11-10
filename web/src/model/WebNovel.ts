@@ -10,6 +10,7 @@ export interface WebNovelOutlineDto {
   //
   favored?: string;
   lastReadAt?: number;
+  lastReadChapterId?: string;
   //
   total: number;
   jp: number;

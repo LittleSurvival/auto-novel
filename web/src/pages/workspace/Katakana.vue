@@ -474,9 +474,7 @@ const radioButtonStyle = (isActive: boolean) => ({
                           </n-radio-button>
                           <n-radio-button
                             value="traditional"
-                            :style="
-                              radioButtonStyle(worker.ner === 'traditional')
-                            "
+                            :style="radioButtonStyle(worker.ner === 'katakana')"
                           >
                             Traditional
                           </n-radio-button>

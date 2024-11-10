@@ -1,3 +1,5 @@
+import { NERTYPE } from '../model/NerType';
+
 export class TextHelper {
   // 平假名
   static readonly HIRAGANA: [number, number] = [0x3040, 0x309f];
@@ -70,8 +72,22 @@ export class TextHelper {
     0x2e00, 0x2e7f,
   ];
 
+  static readonly RE_SPLIT_BY_PUNCTUATION = new RegExp(
+    `[${TextHelper.GENERAL_PUNCTUATION[0]}-${TextHelper.GENERAL_PUNCTUATION[1]}` +
+      `${TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-${TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}` +
+      `${TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-${TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}` +
+      `${TextHelper.LATIN_PUNCTUATION_BASIC_1[0]}-${TextHelper.LATIN_PUNCTUATION_BASIC_1[1]}` +
+      `${TextHelper.LATIN_PUNCTUATION_BASIC_2[0]}-${TextHelper.LATIN_PUNCTUATION_BASIC_2[1]}` +
+      `${TextHelper.LATIN_PUNCTUATION_BASIC_3[0]}-${TextHelper.LATIN_PUNCTUATION_BASIC_3[1]}` +
+      `${TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-${TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}` +
+      `${TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-${TextHelper.LATIN_PUNCTUATION_GENERAL[1]}` +
+      `${TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-${TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}` +
+      `・♥]+`,
+    'u',
+  );
+
   // 判断一个字符是否是中日韩标点符号
-  static is_cjk_punctuation(char: string): boolean {
+  static isCJKpunctuation(char: string): boolean {
     const code = char.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -88,7 +104,7 @@ export class TextHelper {
   }
 
   // 判断一个字符是否是拉丁标点符号
-  static is_latin_punctuation(char: string): boolean {
+  static isLatinpunctuation(char: string): boolean {
     const code = char.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -110,15 +126,14 @@ export class TextHelper {
   }
 
   // 判断一个字符是否是标点符号
-  static is_punctuation(char: string): boolean {
+  static isPunctuation(char: string): boolean {
     return (
-      TextHelper.is_cjk_punctuation(char) ||
-      TextHelper.is_latin_punctuation(char)
+      TextHelper.isCJKpunctuation(char) || TextHelper.isLatinpunctuation(char)
     );
   }
 
   // 判断字符是否为日文字符
-  static is_japanese(ch: string): boolean {
+  static isJapanese(ch: string): boolean {
     const code = ch.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -134,7 +149,7 @@ export class TextHelper {
   }
 
   // 判断字符是否为中日韩汉字
-  static is_cjk(ch: string): boolean {
+  static isCJK(ch: string): boolean {
     const code = ch.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -143,17 +158,17 @@ export class TextHelper {
   }
 
   // 判断输入的字符串是否全部由中日韩汉字组成
-  static is_all_cjk(text: string): boolean {
-    return [...text].every((char) => TextHelper.is_cjk(char));
+  static isAllCJK(text: string): boolean {
+    return [...text].every((char) => TextHelper.isCJK(char));
   }
 
   // 检查字符串是否包含至少一个中日韩汉字
-  static has_any_cjk(text: string): boolean {
-    return [...text].some((char) => TextHelper.is_cjk(char));
+  static hasAnyCJK(text: string): boolean {
+    return [...text].some((char) => TextHelper.isCJK(char));
   }
 
   // 判断字符是否为片假名
-  static is_katakana(ch: string): boolean {
+  static isKatakana(ch: string): boolean {
     const code = ch.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -162,17 +177,17 @@ export class TextHelper {
   }
 
   // 判断字符串是否全部为片假名
-  static is_all_katakana(text: string): boolean {
-    return [...text].every((ch) => TextHelper.is_katakana(ch));
+  static isAllKatakana(text: string): boolean {
+    return [...text].every((ch) => TextHelper.isKatakana(ch));
   }
 
   // 检查字符串是否包含至少一个片假名
-  static has_any_katakana(text: string): boolean {
-    return [...text].some((char) => TextHelper.is_katakana(char));
+  static hasAnyKatakana(text: string): boolean {
+    return [...text].some((char) => TextHelper.isKatakana(char));
   }
 
   // 判断字符是否为平假名
-  static is_hiragana(ch: string): boolean {
+  static isHiragana(ch: string): boolean {
     const code = ch.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -181,34 +196,34 @@ export class TextHelper {
   }
 
   // 判断字符串是否全部为平假名
-  static is_all_hiragana(text: string): boolean {
-    return [...text].every((ch) => TextHelper.is_hiragana(ch));
+  static isAllHiragana(text: string): boolean {
+    return [...text].every((ch) => TextHelper.isHiragana(ch));
   }
 
   // 检查字符串是否包含至少一个平假名
-  static has_any_hiragana(text: string): boolean {
-    return [...text].some((char) => TextHelper.is_hiragana(char));
+  static hasAnyHiragana(text: string): boolean {
+    return [...text].some((char) => TextHelper.isHiragana(char));
   }
 
   // 判断输入的字符串是否全部由日文字符（含汉字）组成
-  static is_all_japanese(text: string): boolean {
-    return [...text].every((char) => TextHelper.is_japanese(char));
+  static isAllJapanese(text: string): boolean {
+    return [...text].every((char) => TextHelper.isJapanese(char));
   }
 
   // 检查字符串是否包含至少一个日文字符（含汉字）
-  static has_any_japanese(text: string): boolean {
-    return [...text].some((char) => TextHelper.is_japanese(char));
+  static hasAnyJapanese(text: string): boolean {
+    return [...text].some((char) => TextHelper.isJapanese(char));
   }
 
   // 移除开头结尾的标点符号
-  static strip_punctuation(text: string): string {
+  static stripPunctuation(text: string): string {
     text = text.trim();
 
-    while (text && TextHelper.is_punctuation(text.charAt(0))) {
+    while (text && TextHelper.isPunctuation(text.charAt(0))) {
       text = text.substring(1);
     }
 
-    while (text && TextHelper.is_punctuation(text.charAt(text.length - 1))) {
+    while (text && TextHelper.isPunctuation(text.charAt(text.length - 1))) {
       text = text.substring(0, text.length - 1);
     }
 
@@ -216,19 +231,19 @@ export class TextHelper {
   }
 
   // 移除开头结尾的阿拉伯数字
-  static strip_arabic_numerals(text: string): string {
+  static stripArabicNumerals(text: string): string {
     return text.replace(/^\d+|\d+$/g, '');
   }
 
   // 移除开头结尾的非日文字符
-  static strip_not_japanese(text: string): string {
+  static stripNotJapanese(text: string): string {
     text = text.trim();
 
-    while (text && !TextHelper.is_japanese(text.charAt(0))) {
+    while (text && !TextHelper.isJapanese(text.charAt(0))) {
       text = text.substring(1);
     }
 
-    while (text && !TextHelper.is_japanese(text.charAt(text.length - 1))) {
+    while (text && !TextHelper.isJapanese(text.charAt(text.length - 1))) {
       text = text.substring(0, text.length - 1);
     }
 
@@ -236,8 +251,8 @@ export class TextHelper {
   }
 
   // 移除结尾的汉字字符
-  static remove_suffix_cjk(text: string): string {
-    while (text && TextHelper.is_cjk(text.charAt(text.length - 1))) {
+  static removeSuffixCJK(text: string): string {
+    while (text && TextHelper.isCJK(text.charAt(text.length - 1))) {
       text = text.substring(0, text.length - 1);
     }
 
@@ -292,21 +307,21 @@ export class TextHelper {
   }
 
   // 按汉字、平假名、片假名拆开日文短语
-  static extract_japanese(text: string): string[] {
+  static extractJapanese(text: string): string[] {
     const pattern = /[\u4E00-\u9FFF]+|[\u3040-\u309F]+|[\u30A0-\u30FF]+/g;
     const matches = text.match(pattern);
     return matches ? matches : [];
   }
 
   // 移除开头结尾的非汉字字符
-  static strip_not_cjk(text: string): string {
+  static stripNotCJK(text: string): string {
     text = text.trim();
 
-    while (text && !TextHelper.is_cjk(text.charAt(0))) {
+    while (text && !TextHelper.isCJK(text.charAt(0))) {
       text = text.substring(1);
     }
 
-    while (text && !TextHelper.is_cjk(text.charAt(text.length - 1))) {
+    while (text && !TextHelper.isCJK(text.charAt(text.length - 1))) {
       text = text.substring(0, text.length - 1);
     }
 
@@ -314,7 +329,7 @@ export class TextHelper {
   }
 
   // 判断字符是否为拉丁字符
-  static is_latin(ch: string): boolean {
+  static isLatin(ch: string): boolean {
     const code = ch.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -332,24 +347,24 @@ export class TextHelper {
   }
 
   // 判断输入的字符串是否全部由拉丁字符组成
-  static is_all_latin(text: string): boolean {
-    return [...text].every((ch) => TextHelper.is_latin(ch));
+  static isAllLatin(text: string): boolean {
+    return [...text].every((ch) => TextHelper.isLatin(ch));
   }
 
   // 检查字符串是否包含至少一个拉丁字符组成
-  static has_any_latin(text: string): boolean {
-    return [...text].some((ch) => TextHelper.is_latin(ch));
+  static hasAnyLatin(text: string): boolean {
+    return [...text].some((ch) => TextHelper.isLatin(ch));
   }
 
   // 移除开头结尾的非拉丁字符
-  static strip_not_latin(text: string): string {
+  static stripNotLatin(text: string): string {
     text = text.trim();
 
-    while (text && !TextHelper.is_latin(text.charAt(0))) {
+    while (text && !TextHelper.isLatin(text.charAt(0))) {
       text = text.substring(1);
     }
 
-    while (text && !TextHelper.is_latin(text.charAt(text.length - 1))) {
+    while (text && !TextHelper.isLatin(text.charAt(text.length - 1))) {
       text = text.substring(0, text.length - 1);
     }
 
@@ -357,7 +372,7 @@ export class TextHelper {
   }
 
   // 判断字符是否为韩文字符
-  static is_korean(ch: string): boolean {
+  static isKorean(ch: string): boolean {
     const code = ch.codePointAt(0);
     if (code === undefined) {
       return false;
@@ -378,24 +393,24 @@ export class TextHelper {
   }
 
   // 判断输入的字符串是否全部由韩文字符组成
-  static is_all_korean(text: string): boolean {
-    return [...text].every((ch) => TextHelper.is_korean(ch));
+  static isAllKorean(text: string): boolean {
+    return [...text].every((ch) => TextHelper.isKorean(ch));
   }
 
   // 检查字符串是否包含至少一个韩文字符组成
-  static has_any_korean(text: string): boolean {
-    return [...text].some((ch) => TextHelper.is_korean(ch));
+  static hasAnyKorean(text: string): boolean {
+    return [...text].some((ch) => TextHelper.isKorean(ch));
   }
 
   // 移除开头结尾的非韩文字符
-  static strip_not_korean(text: string): string {
+  static stripNotKorean(text: string): string {
     text = text.trim();
 
-    while (text && !TextHelper.is_korean(text.charAt(0))) {
+    while (text && !TextHelper.isKorean(text.charAt(0))) {
       text = text.substring(1);
     }
 
-    while (text && !TextHelper.is_korean(text.charAt(text.length - 1))) {
+    while (text && !TextHelper.isKorean(text.charAt(text.length - 1))) {
       text = text.substring(0, text.length - 1);
     }
 
@@ -406,14 +421,57 @@ export class TextHelper {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  static is_valid_japanese_word(
+  static isValidJapaneseWord(
     surface: string,
     blacklist: string[] = [],
   ): boolean {
     return (
       surface.length > 1 &&
       !blacklist.includes(surface) &&
-      TextHelper.has_any_japanese(surface)
+      TextHelper.hasAnyJapanese(surface)
     );
+  }
+
+  static isValidCJKWord(surface: string, blacklist: string[] = []): boolean {
+    return (
+      surface.length > 1 &&
+      !blacklist.includes(surface) &&
+      TextHelper.hasAnyCJK(surface)
+    );
+  }
+
+  static isValidKoreanWord(surface: string, blacklist: string[] = []): boolean {
+    return (
+      surface.length > 1 &&
+      !blacklist.includes(surface) &&
+      TextHelper.hasAnyKorean(surface)
+    );
+  }
+
+  static isValidEnglishWord(
+    surface: string,
+    blacklist: string[] = [],
+    nerType: string,
+    uniqueWords: string[] = [],
+  ): boolean {
+    if (
+      surface.length <= 2 ||
+      !TextHelper.hasAnyLatin(surface) ||
+      blacklist.includes(surface) ||
+      (nerType == NERTYPE.PER && !(surface[0] === surface[0].toUpperCase()))
+    ) {
+      return false;
+    }
+    if (uniqueWords !== undefined) {
+      const chunks = surface.match(/\b\w+\b/g);
+      if (
+        chunks &&
+        chunks.length > 0 &&
+        !chunks.every((chunk) => uniqueWords.includes(chunk))
+      ) {
+        return false;
+      }
+    }
+    return true;
   }
 }

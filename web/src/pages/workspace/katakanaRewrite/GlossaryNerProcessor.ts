@@ -1,7 +1,9 @@
 import { GlossaryConfig, GlossaryWorker } from '@/model/IGlossary';
 import { Word } from './model/Word';
-import { NERTYPE } from './model/NerType';
+import { NER_TYPES, NERTYPE } from './model/NerType';
 import { LogHelper } from './helper/LogHelper';
+import { TextHelper } from './helper/TextHelper';
+import { LANGUAGE } from './GlossaryGenerator';
 
 export class GlossaryNerProcessor {
   private config: GlossaryWorker;
@@ -52,5 +54,67 @@ export class GlossaryNerProcessor {
     });
 
     return words.sort((a, b) => b.count - a.count);
+  }
+
+  async generateGlossaryLocal(): Promise<Word[]> {
+    return [];
+  }
+
+  async packNERResultToWords(
+    surface: string,
+    context: string,
+    score: number,
+    nerType: string,
+    language: string,
+    uniqueWords: string[],
+  ): Promise<Word[]> {
+    let words: Word[] = [];
+    let surfaces: string[] = [];
+
+    if (nerType != NERTYPE.PER) {
+      surfaces.push(surface);
+    } else {
+      surfaces = surface.split(TextHelper.RE_SPLIT_BY_PUNCTUATION);
+    }
+
+    for (surface of surfaces) {
+      if (!NER_TYPES.includes(nerType)) continue;
+      if (language === LANGUAGE.ZH) {
+        surface = TextHelper.stripNotCJK(surface);
+        if (!TextHelper.isValidCJKWord(surface, this.blacklist)) {
+          continue;
+        }
+      }
+      if (language === LANGUAGE.EN) {
+        surface = TextHelper.stripNotLatin(surface);
+        if (
+          !TextHelper.isValidEnglishWord(
+            surface,
+            this.blacklist,
+            nerType,
+            uniqueWords,
+          )
+        )
+          continue;
+      }
+      if (language === LANGUAGE.JP) {
+        surface = TextHelper.stripNotJapanese(surface).replace(/の$/, '');
+        if (!TextHelper.isValidJapaneseWord(surface, this.blacklist)) continue;
+      }
+      if (language === LANGUAGE.KR) {
+        surface = TextHelper.stripNotKorean(surface);
+        if (!TextHelper.isValidKoreanWord(surface, this.blacklist)) continue;
+      }
+      const word = new Word();
+      word.surface = surface;
+      word.count = 1;
+      word.score = score;
+      word.context.push(context);
+      word.nerType = nerType;
+
+      words.push(word);
+    }
+
+    return words;
   }
 }

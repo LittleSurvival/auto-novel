@@ -125,9 +125,12 @@ defineExpose({
           <template v-if="item.updateAt">
             本站更新于<n-time :time="item.updateAt * 1000" type="relative" /> /
           </template>
-          <template v-if="item.lastReadAt">
-            <n-time :time="item.lastReadAt * 1000" type="relative" />看过 /
+          <template v-if="!item.lastReadChapterId">
+            最后观看 {{}} 未知
           </template>
+          <!-- <template v-if="item.lastReadAt">
+            <n-time :time="item.lastReadAt * 1000" type="relative" />看过 /
+          </template> -->
         </n-text>
       </n-flex>
 

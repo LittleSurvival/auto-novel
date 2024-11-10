@@ -77,7 +77,7 @@ export class GlossaryGenerator {
 
     //Debug mode for threshold(Deleted)
     this.logger.info('消去重複字和計算詞彙出現次數');
-    if (this.config.ner != 'traditional') {
+    if (this.config.ner != 'katakana') {
       words = await this.mergeAndCount(words, contentLines, language);
     } else this.logger.info(`NER分詞模式為傳統 查找時已完成此步驟`);
 
@@ -241,13 +241,13 @@ export class GlossaryGenerator {
       let totalCount = 0;
 
       for (const char of line) {
-        if (TextHelper.is_japanese(char)) {
+        if (TextHelper.isJapanese(char)) {
           jpCount++;
-        } else if (TextHelper.is_korean(char)) {
+        } else if (TextHelper.isKorean(char)) {
           krCount++;
-        } else if (TextHelper.is_cjk(char)) {
+        } else if (TextHelper.isCJK(char)) {
           zhCount++;
-        } else if (TextHelper.is_latin(char)) {
+        } else if (TextHelper.isLatin(char)) {
           enCount++;
         }
         totalCount++;
@@ -362,7 +362,7 @@ export class GlossaryGenerator {
     language: LANGUAGE,
   ): Promise<Word[]> {
     const uniqueKeys = words
-      .map((word) => `${word.surface}_${word.ner_type}`)
+      .map((word) => `${word.surface}_${word.nerType}`)
       .filter((value, index, self) => self.indexOf(value) === index); //只有文字和类型都一样才视为相同条目，避免跨类词条目合并
     //置信度篩選，尚無參考和準確測試數據，暫定0.8
     const threshold: { [key in LANGUAGE]: [number, number] } = {
@@ -379,7 +379,7 @@ export class GlossaryGenerator {
     for (const key of uniqueKeys) {
       const [surface, ner_type] = key.split('_');
       let group = words.filter(
-        (w) => w.surface === surface && w.ner_type === ner_type,
+        (w) => w.surface === surface && w.nerType === ner_type,
       );
       let word = group[0];
 
@@ -389,8 +389,8 @@ export class GlossaryGenerator {
       );
 
       if (
-        (word.ner_type === 'PER' && word.score > threshold_x) ||
-        (word.ner_type !== 'PER' && word.score > threshold_y)
+        (word.nerType === 'PER' && word.score > threshold_x) ||
+        (word.nerType !== 'PER' && word.score > threshold_y)
       ) {
         words_merged.push(word);
       }
@@ -398,10 +398,10 @@ export class GlossaryGenerator {
 
     const words_categorized: { [key: string]: Word[] } = {};
     for (const word of words_merged) {
-      if (!words_categorized[word.ner_type]) {
-        words_categorized[word.ner_type] = [];
+      if (!words_categorized[word.nerType]) {
+        words_categorized[word.nerType] = [];
       }
-      words_categorized[word.ner_type].push(word);
+      words_categorized[word.nerType].push(word);
     }
 
     const words_counted: Word[] = [];
@@ -433,11 +433,11 @@ export class GlossaryGenerator {
   }
 
   getWordsByNerType(words: Word[], nertype: NERTYPE): Word[] {
-    return words.filter((w) => w.ner_type == nertype);
+    return words.filter((w) => w.nerType == nertype);
   }
 
   removeWordsByNerType(words: Word[], nertype: NERTYPE): Word[] {
-    return words.filter((w) => w.ner_type != nertype);
+    return words.filter((w) => w.nerType != nertype);
   }
 
   replaceWordsByNerType(
@@ -458,12 +458,12 @@ export class GlossaryGenerator {
     const personWords = this.getWordsByNerType(words, NERTYPE.PER);
 
     words.forEach((w) => {
-      if (w.ner_type == NERTYPE.PER) return;
+      if (w.nerType == NERTYPE.PER) return;
       if (
         personWords.map((w) => w.surface).some((v) => w.surface.includes(v))
       ) {
-        this.logger.info(`重複性校驗 剔除詞語 ${w.surface} - ${w.ner_type}`);
-        w.ner_type = NERTYPE.EMPTY;
+        this.logger.info(`重複性校驗 剔除詞語 ${w.surface} - ${w.nerType}`);
+        w.nerType = NERTYPE.EMPTY;
       }
     });
 
@@ -475,20 +475,20 @@ export class GlossaryGenerator {
 
     words.forEach((word) => {
       // 以下步骤只对角色实体进行
-      if (word.ner_type !== NERTYPE.PER) return;
+      if (word.nerType !== NERTYPE.PER) return;
 
       // 前面的步骤中已经移除了首尾的 の，如果还有，那就是 AのB 的形式，跳过
       if (word.surface.includes('の')) return;
 
       // 如果开头结尾都是汉字，跳过
       if (
-        TextHelper.is_cjk(word.surface[0]) &&
-        TextHelper.is_cjk(word.surface[word.surface.length - 1])
+        TextHelper.isCJK(word.surface[0]) &&
+        TextHelper.isCJK(word.surface[word.surface.length - 1])
       )
         return;
 
       // 拆分词根
-      const tokens = TextHelper.extract_japanese(word.surface);
+      const tokens = TextHelper.extractJapanese(word.surface);
 
       // 如果已不能再拆分，跳过
       if (tokens.length === 1) return;
@@ -496,8 +496,8 @@ export class GlossaryGenerator {
       // 获取词根，获取成功则更新词语
       const roots: string[] = [];
       tokens.forEach((v) => {
-        if (TextHelper.is_valid_japanese_word(v, this.blacklist)) {
-          const wordEx = new Word(v, word.ner_type, word.count, word.score);
+        if (TextHelper.isValidJapaneseWord(v, this.blacklist)) {
+          const wordEx = new Word(v, word.nerType, word.count, word.score);
 
           roots.push(v);
           wordsEx.push(wordEx);
@@ -506,9 +506,9 @@ export class GlossaryGenerator {
 
       if (roots.length > 0) {
         this.logger.info(
-          `通过词语形态还原词根 ${word.ner_type} - ${word.surface} ${roots.join(' / ')}`,
+          `通过词语形态还原词根 ${word.nerType} - ${word.surface} ${roots.join(' / ')}`,
         );
-        word.ner_type = '';
+        word.nerType = '';
       }
     });
 
@@ -520,7 +520,7 @@ export class GlossaryGenerator {
     const glossarys: WGlossary = {};
     words.forEach((word) => {
       glossarys[word.surface] = {
-        zh: word.surface_translation[0],
+        zh: word.surfaceTranslation[0],
         count: word.count,
         info: word.toString(),
       };

@@ -8,6 +8,8 @@ export enum NERTYPE {
   EMPTY = '', //用於刪除指定詞語
 }
 
+export const NER_TYPES = ['PER', 'ORG', 'LOC', 'PRD', 'EVT'];
+
 export const NERTYPECHINESE: { [key: string]: string } = {
   PER: '角色实体',
   ORG: '组织实体',

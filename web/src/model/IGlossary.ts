@@ -13,7 +13,7 @@ export type WGlossary = {
 
 export interface GlossaryWorker {
   type: 'local' | 'api'; //localhost 或使用在線大模型
-  ner: 'local' | 'traditional' | 'api'; //local 使用本地ner lm | traditional 使用 片假名分詞 | api目前無法實現(due to promote engineering)
+  ner: 'local' | 'katakana' | 'api'; //local 使用本地ner lm | katakana 使用 片假名分詞 | api目前無法實現(due to promote engineering)
   apikey: string; //在線大模型的apikey
   baseurl: string; //url
   modelname: string; //在線大模型的modelname

@@ -4,19 +4,19 @@ export class Word {
   score: number;
   count: number;
   context: string[];
-  context_summary: string;
-  context_translation: string[];
+  contextSummary: string;
+  contextTranslation: string[];
   surface: string;
-  surface_romaji: string;
-  surface_translation: string[];
-  surface_translation_description: string;
-  ner_type: string;
+  surfaceRomaji: string;
+  surfaceTranslation: string[];
+  surfaceTranslationDescription: string;
+  nerType: string;
   attribute: string;
-  llmresponse_summarize_context: string;
-  llmresponse_translate_context: string;
-  llmresponse_translate_surface: string;
+  llmresponseSummarizeContext: string;
+  llmresponseTranslateContext: string;
+  llmresponseTranslateSurface: string;
 
-  tiktoken_encoding: any; // Placeholder type for tokenizer encoding
+  tiktokenEncoding: any; // Placeholder type for tokenizer encoding
   CONTEXT_TOKEN_THRESHOLD = 768; // 上下文 token 阈值
 
   static MATCH_LENGTHS_CACHE: Record<string, number> = {}; //靜態緩存
@@ -30,17 +30,17 @@ export class Word {
     this.score = score;
     this.count = count;
     this.context = [];
-    this.context_summary = '';
-    this.context_translation = [];
+    this.contextSummary = '';
+    this.contextTranslation = [];
     this.surface = surface;
-    this.surface_romaji = '';
-    this.surface_translation = [];
-    this.surface_translation_description = '';
-    this.ner_type = ner_type;
+    this.surfaceRomaji = '';
+    this.surfaceTranslation = [];
+    this.surfaceTranslationDescription = '';
+    this.nerType = ner_type;
     this.attribute = '';
-    this.llmresponse_summarize_context = '';
-    this.llmresponse_translate_context = '';
-    this.llmresponse_translate_surface = '';
+    this.llmresponseSummarizeContext = '';
+    this.llmresponseTranslateContext = '';
+    this.llmresponseTranslateSurface = '';
   }
 
   toString(): string {
@@ -48,17 +48,17 @@ export class Word {
       score=${this.score}
       count=${this.count}
       context=${JSON.stringify(this.context)}
-      context_summary=${this.context_summary}
-      context_translation=${JSON.stringify(this.context_translation)}
+      context_summary=${this.contextSummary}
+      context_translation=${JSON.stringify(this.contextTranslation)}
       surface=${this.surface}
-      surface_romaji=${this.surface_romaji}
-      surface_translation=${this.surface_translation}
-      surface_translation_description=${this.surface_translation_description}
-      ner_type=${this.ner_type}
+      surface_romaji=${this.surfaceRomaji}
+      surface_translation=${this.surfaceTranslation}
+      surface_translation_description=${this.surfaceTranslationDescription}
+      ner_type=${this.nerType}
       attribute=${this.attribute}
-      llmresponse_summarize_context=${this.llmresponse_summarize_context}
-      llmresponse_translate_context=${this.llmresponse_translate_context}
-      llmresponse_translate_surface=${this.llmresponse_translate_surface}
+      llmresponse_summarize_context=${this.llmresponseSummarizeContext}
+      llmresponse_translate_context=${this.llmresponseTranslateContext}
+      llmresponse_translate_surface=${this.llmresponseTranslateSurface}
       `;
   }
 
@@ -141,7 +141,7 @@ export class Word {
 
     if (!this.context || this.context.length === 0) {
       logger.debug(
-        `${this.surface} - ${this.ner_type} - ${this.count} - ${this.context} ...`,
+        `${this.surface} - ${this.nerType} - ${this.count} - ${this.context} ...`,
       );
       return [];
     }
