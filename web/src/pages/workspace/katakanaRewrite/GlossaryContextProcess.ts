@@ -91,14 +91,10 @@ export class GlosssaryContextProcessor {
 
   private MAX_RETRY = 2;
 
-  constructor(config: GlossaryWorker, logger: LogHelper) {
+  constructor(config: GlossaryWorker, api: any, logger: LogHelper) {
     this.config = config;
     this.logger = logger;
-    this.api = Locator.openAiRepositoryFactory(
-      config.baseurl,
-      config.apikey,
-      config.timeout,
-    );
+    this.api = api;
   }
 
   loadBlackList = (blacklist: string[]) => {

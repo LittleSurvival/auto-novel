@@ -6,14 +6,16 @@ import { TextHelper } from './helper/TextHelper';
 import { LANGUAGE } from './GlossaryGenerator';
 
 export class GlossaryNerProcessor {
-  private config: GlossaryWorker;
+  private worker: GlossaryWorker;
+  private api: any;
   private nermode: string;
   private logger: LogHelper;
   private blacklist: string[] = [];
 
-  constructor(config: GlossaryWorker, logger: LogHelper) {
-    this.config = config;
-    this.nermode = this.config.ner;
+  constructor(worker: GlossaryWorker, api: any, logger: LogHelper) {
+    this.worker = worker;
+    this.api = api;
+    this.nermode = this.worker.ner;
     this.logger = logger;
   }
 
@@ -22,11 +24,13 @@ export class GlossaryNerProcessor {
   }
 
   async generateWord(content: string): Promise<Word[]> {
-    if (this.nermode == 'traditional') {
+    if (this.nermode == 'katakana') {
       return await this.generateGlossaryTraditional(
         content,
-        this.config.countthreshold,
+        this.worker.countthreshold,
       );
+    }
+    if (this.nermode == 'local') {
     }
     return [];
   }

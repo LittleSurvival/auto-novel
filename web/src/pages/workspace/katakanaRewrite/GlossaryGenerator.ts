@@ -5,6 +5,7 @@ import { TextHelper } from './helper/TextHelper';
 import { NERTYPE, NERTYPECHINESE } from './model/NerType';
 import { GlosssaryContextProcessor, TaskType } from './GlossaryContextProcess';
 import { GlossaryNerProcessor } from './GlossaryNerProcessor';
+import { Locator } from '@/data';
 
 export enum LANGUAGE {
   ZH = 'ZH',
@@ -22,6 +23,7 @@ const LANGUAGETEXT = {
 
 export class GlossaryGenerator {
   private logger: LogHelper;
+  private api;
   private config: GlossaryWorker;
   private contextProcessor: GlosssaryContextProcessor;
   private nerProcessor: GlossaryNerProcessor;
@@ -32,9 +34,18 @@ export class GlossaryGenerator {
     this.logger.clearLogs();
     this.config = config;
     this.blacklist = blacklist;
+    this.api = Locator.openAiRepositoryFactory(
+      config.baseurl,
+      config.apikey,
+      config.timeout,
+    );
 
-    this.contextProcessor = new GlosssaryContextProcessor(config, logger);
-    this.nerProcessor = new GlossaryNerProcessor(config, logger);
+    this.contextProcessor = new GlosssaryContextProcessor(
+      config,
+      this.api,
+      logger,
+    );
+    this.nerProcessor = new GlossaryNerProcessor(config, this.api, logger);
 
     this.contextProcessor.loadBlackList(this.blacklist);
     this.nerProcessor.loadBlackList(this.blacklist);
